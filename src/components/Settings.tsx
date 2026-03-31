@@ -123,6 +123,23 @@ export default function SettingsPage() {
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
             />
           </div>
+          <div className="col-span-2">
+            <label className="text-xs text-gray-400 block mb-1">OpenAI API Key</label>
+            <input
+              type="password"
+              value={settings.openaiApiKey || ''}
+              onChange={(e) => updateSetting('openaiApiKey', e.target.value)}
+              placeholder="sk-... (for Whisper transcription & AI summaries)"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            />
+            <p className="text-xs text-gray-300 mt-1">
+              Free tier available at{' '}
+              <a href="https://platform.openai.com/signup" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                platform.openai.com
+              </a>
+              . Used for audio transcription (Whisper) and meeting summaries.
+            </p>
+          </div>
         </div>
       </div>
 

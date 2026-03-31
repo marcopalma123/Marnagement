@@ -63,6 +63,7 @@ export interface Settings {
   businessEmail: string;
   businessAddress: string;
   currencies: CurrencyConfig[];
+  openaiApiKey?: string;
 }
 
 export interface CurrencyConfig {
