@@ -1,6 +1,7 @@
-// Data persistence layer using localStorage
+// Data persistence layer using localStorage + optional Neon database
 
 import { WorkDay, Client, Meeting, Invoice, Settings, Template } from '@/types';
+import * as db from './db';
 
 const STORAGE_KEYS = {
   workDays: 'marnagement_workDays',
@@ -26,9 +27,15 @@ function set<T>(key: string, value: T): void {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+const isDbAvailable = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_DATABASE_URL;
+
 // Work Days
 export function getWorkDays(): WorkDay[] {
   return get(STORAGE_KEYS.workDays, []);
+}
+
+export async function getWorkDaysRemote(): Promise<WorkDay[]> {
+  return db.getWorkDaysDb();
 }
 
 export function saveWorkDay(day: WorkDay): void {
@@ -40,16 +47,28 @@ export function saveWorkDay(day: WorkDay): void {
     days.push(day);
   }
   set(STORAGE_KEYS.workDays, days);
+  
+  if (isDbAvailable) {
+    db.saveWorkDayDb(day).catch(console.error);
+  }
 }
 
 export function deleteWorkDay(id: string): void {
   const days = getWorkDays().filter((d) => d.id !== id);
   set(STORAGE_KEYS.workDays, days);
+  
+  if (isDbAvailable) {
+    db.deleteWorkDayDb(id).catch(console.error);
+  }
 }
 
 // Clients
 export function getClients(): Client[] {
   return get(STORAGE_KEYS.clients, []);
+}
+
+export async function getClientsRemote(): Promise<Client[]> {
+  return db.getClientsDb();
 }
 
 export function saveClient(client: Client): void {
@@ -61,16 +80,28 @@ export function saveClient(client: Client): void {
     clients.push(client);
   }
   set(STORAGE_KEYS.clients, clients);
+  
+  if (isDbAvailable) {
+    db.saveClientDb(client).catch(console.error);
+  }
 }
 
 export function deleteClient(id: string): void {
   const clients = getClients().filter((c) => c.id !== id);
   set(STORAGE_KEYS.clients, clients);
+  
+  if (isDbAvailable) {
+    db.deleteClientDb(id).catch(console.error);
+  }
 }
 
 // Meetings
 export function getMeetings(): Meeting[] {
   return get(STORAGE_KEYS.meetings, []);
+}
+
+export async function getMeetingsRemote(): Promise<Meeting[]> {
+  return db.getMeetingsDb();
 }
 
 export function saveMeeting(meeting: Meeting): void {
@@ -82,16 +113,28 @@ export function saveMeeting(meeting: Meeting): void {
     meetings.push(meeting);
   }
   set(STORAGE_KEYS.meetings, meetings);
+  
+  if (isDbAvailable) {
+    db.saveMeetingDb(meeting).catch(console.error);
+  }
 }
 
 export function deleteMeeting(id: string): void {
   const meetings = getMeetings().filter((m) => m.id !== id);
   set(STORAGE_KEYS.meetings, meetings);
+  
+  if (isDbAvailable) {
+    db.deleteMeetingDb(id).catch(console.error);
+  }
 }
 
 // Invoices
 export function getInvoices(): Invoice[] {
   return get(STORAGE_KEYS.invoices, []);
+}
+
+export async function getInvoicesRemote(): Promise<Invoice[]> {
+  return db.getInvoicesDb();
 }
 
 export function saveInvoice(invoice: Invoice): void {
@@ -103,11 +146,19 @@ export function saveInvoice(invoice: Invoice): void {
     invoices.push(invoice);
   }
   set(STORAGE_KEYS.invoices, invoices);
+  
+  if (isDbAvailable) {
+    db.saveInvoiceDb(invoice).catch(console.error);
+  }
 }
 
 export function deleteInvoice(id: string): void {
   const invoices = getInvoices().filter((i) => i.id !== id);
   set(STORAGE_KEYS.invoices, invoices);
+  
+  if (isDbAvailable) {
+    db.deleteInvoiceDb(id).catch(console.error);
+  }
 }
 
 // Settings
@@ -128,13 +179,25 @@ export function getSettings(): Settings {
   });
 }
 
+export async function getSettingsRemote(): Promise<Settings | null> {
+  return db.getSettingsDb();
+}
+
 export function saveSettings(settings: Settings): void {
   set(STORAGE_KEYS.settings, settings);
+  
+  if (isDbAvailable) {
+    db.saveSettingsDb(settings).catch(console.error);
+  }
 }
 
 // Templates
 export function getTemplates(): Template[] {
   return get(STORAGE_KEYS.templates, []);
+}
+
+export async function getTemplatesRemote(): Promise<Template[]> {
+  return db.getTemplatesDb();
 }
 
 export function saveTemplate(template: Template): void {
@@ -146,11 +209,19 @@ export function saveTemplate(template: Template): void {
     templates.push(template);
   }
   set(STORAGE_KEYS.templates, templates);
+  
+  if (isDbAvailable) {
+    db.saveTemplateDb(template).catch(console.error);
+  }
 }
 
 export function deleteTemplate(id: string): void {
   const templates = getTemplates().filter((t) => t.id !== id);
   set(STORAGE_KEYS.templates, templates);
+  
+  if (isDbAvailable) {
+    db.deleteTemplateDb(id).catch(console.error);
+  }
 }
 
 // Export all data as JSON
