@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Template, TemplateField, Settings } from '@/types';
-import { getTemplates, saveTemplate, deleteTemplate, getSettings, generateId } from '@/lib/store';
+import { getTemplates, saveTemplate, deleteTemplate, getSettings, generateId, getTemplatesRemote, getSettingsRemote } from '@/lib/store';
 import { PenTool, Plus, X, Trash2, Download } from 'lucide-react';
 
 export default function Editor() {
@@ -17,8 +17,15 @@ export default function Editor() {
   ]);
 
   useEffect(() => {
-    setTemplates(getTemplates());
-    setSettings(getSettings());
+    async function loadData() {
+      const [t, s] = await Promise.all([
+        getTemplatesRemote(),
+        getSettingsRemote()
+      ]);
+      setTemplates(t);
+      setSettings(s || getSettings());
+    }
+    loadData();
   }, []);
 
   const openTemplate = (t: Template) => {

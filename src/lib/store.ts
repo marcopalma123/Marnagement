@@ -1,7 +1,6 @@
-// Data persistence layer using localStorage + optional Neon database
+// Data persistence layer using localStorage + server API for database
 
-import { WorkDay, Client, Meeting, Invoice, Settings, Template } from '@/types';
-import * as db from './db';
+import { WorkDay, Client, Meeting, Invoice, Settings, Template, SpecialDay, Project } from '@/types';
 
 const STORAGE_KEYS = {
   workDays: 'marnagement_workDays',
@@ -10,6 +9,8 @@ const STORAGE_KEYS = {
   invoices: 'marnagement_invoices',
   settings: 'marnagement_settings',
   templates: 'marnagement_templates',
+  specialDays: 'marnagement_specialDays',
+  projects: 'marnagement_projects',
 } as const;
 
 function get<T>(key: string, fallback: T): T {
@@ -27,7 +28,37 @@ function set<T>(key: string, value: T): void {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
-const isDbAvailable = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_DATABASE_URL;
+async function callDbApi<T>(action: string, data?: unknown): Promise<T | null> {
+  try {
+    const response = await fetch('/api/db?type=' + action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, data }),
+    });
+    if (!response.ok) return null;
+    const result = await response.json();
+    return result as T;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchFromDb<T>(type: string): Promise<T | null> {
+  try {
+    console.log('[fetchFromDb] fetching type:', type);
+    const response = await fetch('/api/db?type=' + type);
+    if (!response.ok) {
+      console.log('[fetchFromDb] response not ok:', response.status);
+      return null;
+    }
+    const data = await response.json();
+    console.log('[fetchFromDb] received data for', type, ':', data);
+    return data;
+  } catch (e) {
+    console.log('[fetchFromDb] error:', e);
+    return null;
+  }
+}
 
 // Work Days
 export function getWorkDays(): WorkDay[] {
@@ -35,7 +66,13 @@ export function getWorkDays(): WorkDay[] {
 }
 
 export async function getWorkDaysRemote(): Promise<WorkDay[]> {
-  return db.getWorkDaysDb();
+  const data = await fetchFromDb<WorkDay[]>('workdays');
+  console.log('[getWorkDaysRemote] data from DB:', data);
+  if (data) {
+    set(STORAGE_KEYS.workDays, data);
+    return data;
+  }
+  return get(STORAGE_KEYS.workDays, []);
 }
 
 export function saveWorkDay(day: WorkDay): void {
@@ -47,19 +84,13 @@ export function saveWorkDay(day: WorkDay): void {
     days.push(day);
   }
   set(STORAGE_KEYS.workDays, days);
-  
-  if (isDbAvailable) {
-    db.saveWorkDayDb(day).catch(console.error);
-  }
+  callDbApi('saveWorkDay', day);
 }
 
 export function deleteWorkDay(id: string): void {
   const days = getWorkDays().filter((d) => d.id !== id);
   set(STORAGE_KEYS.workDays, days);
-  
-  if (isDbAvailable) {
-    db.deleteWorkDayDb(id).catch(console.error);
-  }
+  callDbApi('deleteWorkDay', { id });
 }
 
 // Clients
@@ -68,7 +99,12 @@ export function getClients(): Client[] {
 }
 
 export async function getClientsRemote(): Promise<Client[]> {
-  return db.getClientsDb();
+  const data = await fetchFromDb<Client[]>('clients');
+  if (data && data.length > 0) {
+    set(STORAGE_KEYS.clients, data);
+    return data;
+  }
+  return get(STORAGE_KEYS.clients, []);
 }
 
 export function saveClient(client: Client): void {
@@ -80,19 +116,13 @@ export function saveClient(client: Client): void {
     clients.push(client);
   }
   set(STORAGE_KEYS.clients, clients);
-  
-  if (isDbAvailable) {
-    db.saveClientDb(client).catch(console.error);
-  }
+  callDbApi('saveClient', client);
 }
 
 export function deleteClient(id: string): void {
   const clients = getClients().filter((c) => c.id !== id);
   set(STORAGE_KEYS.clients, clients);
-  
-  if (isDbAvailable) {
-    db.deleteClientDb(id).catch(console.error);
-  }
+  callDbApi('deleteClient', { id });
 }
 
 // Meetings
@@ -101,7 +131,12 @@ export function getMeetings(): Meeting[] {
 }
 
 export async function getMeetingsRemote(): Promise<Meeting[]> {
-  return db.getMeetingsDb();
+  const data = await fetchFromDb<Meeting[]>('meetings');
+  if (data && data.length > 0) {
+    set(STORAGE_KEYS.meetings, data);
+    return data;
+  }
+  return get(STORAGE_KEYS.meetings, []);
 }
 
 export function saveMeeting(meeting: Meeting): void {
@@ -113,19 +148,13 @@ export function saveMeeting(meeting: Meeting): void {
     meetings.push(meeting);
   }
   set(STORAGE_KEYS.meetings, meetings);
-  
-  if (isDbAvailable) {
-    db.saveMeetingDb(meeting).catch(console.error);
-  }
+  callDbApi('saveMeeting', meeting);
 }
 
 export function deleteMeeting(id: string): void {
   const meetings = getMeetings().filter((m) => m.id !== id);
   set(STORAGE_KEYS.meetings, meetings);
-  
-  if (isDbAvailable) {
-    db.deleteMeetingDb(id).catch(console.error);
-  }
+  callDbApi('deleteMeeting', { id });
 }
 
 // Invoices
@@ -134,7 +163,13 @@ export function getInvoices(): Invoice[] {
 }
 
 export async function getInvoicesRemote(): Promise<Invoice[]> {
-  return db.getInvoicesDb();
+  const data = await fetchFromDb<Invoice[]>('invoices');
+  console.log('[getInvoicesRemote] data from DB:', data);
+  if (data) {
+    set(STORAGE_KEYS.invoices, data);
+    return data;
+  }
+  return get(STORAGE_KEYS.invoices, []);
 }
 
 export function saveInvoice(invoice: Invoice): void {
@@ -146,19 +181,13 @@ export function saveInvoice(invoice: Invoice): void {
     invoices.push(invoice);
   }
   set(STORAGE_KEYS.invoices, invoices);
-  
-  if (isDbAvailable) {
-    db.saveInvoiceDb(invoice).catch(console.error);
-  }
+  callDbApi('saveInvoice', invoice);
 }
 
 export function deleteInvoice(id: string): void {
   const invoices = getInvoices().filter((i) => i.id !== id);
   set(STORAGE_KEYS.invoices, invoices);
-  
-  if (isDbAvailable) {
-    db.deleteInvoiceDb(id).catch(console.error);
-  }
+  callDbApi('deleteInvoice', { id });
 }
 
 // Settings
@@ -180,15 +209,17 @@ export function getSettings(): Settings {
 }
 
 export async function getSettingsRemote(): Promise<Settings | null> {
-  return db.getSettingsDb();
+  const data = await fetchFromDb<Settings>('settings');
+  if (data) {
+    set(STORAGE_KEYS.settings, data);
+    return data;
+  }
+  return getSettings();
 }
 
 export function saveSettings(settings: Settings): void {
   set(STORAGE_KEYS.settings, settings);
-  
-  if (isDbAvailable) {
-    db.saveSettingsDb(settings).catch(console.error);
-  }
+  callDbApi('saveSettings', settings);
 }
 
 // Templates
@@ -197,7 +228,12 @@ export function getTemplates(): Template[] {
 }
 
 export async function getTemplatesRemote(): Promise<Template[]> {
-  return db.getTemplatesDb();
+  const data = await fetchFromDb<Template[]>('templates');
+  if (data && data.length > 0) {
+    set(STORAGE_KEYS.templates, data);
+    return data;
+  }
+  return get(STORAGE_KEYS.templates, []);
 }
 
 export function saveTemplate(template: Template): void {
@@ -209,19 +245,78 @@ export function saveTemplate(template: Template): void {
     templates.push(template);
   }
   set(STORAGE_KEYS.templates, templates);
-  
-  if (isDbAvailable) {
-    db.saveTemplateDb(template).catch(console.error);
-  }
+  callDbApi('saveTemplate', template);
 }
 
 export function deleteTemplate(id: string): void {
   const templates = getTemplates().filter((t) => t.id !== id);
   set(STORAGE_KEYS.templates, templates);
-  
-  if (isDbAvailable) {
-    db.deleteTemplateDb(id).catch(console.error);
+  callDbApi('deleteTemplate', { id });
+}
+
+// Special Days
+export function getSpecialDays(): SpecialDay[] {
+  return get(STORAGE_KEYS.specialDays, []);
+}
+
+export async function getSpecialDaysRemote(): Promise<SpecialDay[]> {
+  const data = await fetchFromDb<SpecialDay[]>('specialdays');
+  console.log('[getSpecialDaysRemote] data from DB:', data);
+  if (data) {
+    set(STORAGE_KEYS.specialDays, data);
+    return data;
   }
+  return get(STORAGE_KEYS.specialDays, []);
+}
+
+export function saveSpecialDay(day: SpecialDay): void {
+  const days = getSpecialDays();
+  const idx = days.findIndex((d) => d.id === day.id);
+  if (idx >= 0) {
+    days[idx] = day;
+  } else {
+    days.push(day);
+  }
+  set(STORAGE_KEYS.specialDays, days);
+  callDbApi('saveSpecialDay', day);
+}
+
+export function deleteSpecialDay(id: string): void {
+  const days = getSpecialDays().filter((d) => d.id !== id);
+  set(STORAGE_KEYS.specialDays, days);
+  callDbApi('deleteSpecialDay', { id });
+}
+
+// Projects
+export function getProjects(): Project[] {
+  return get(STORAGE_KEYS.projects, []);
+}
+
+export async function getProjectsRemote(): Promise<Project[]> {
+  const data = await fetchFromDb<Project[]>('projects');
+  if (data && data.length > 0) {
+    set(STORAGE_KEYS.projects, data);
+    return data;
+  }
+  return get(STORAGE_KEYS.projects, []);
+}
+
+export function saveProject(project: Project): void {
+  const projects = getProjects();
+  const idx = projects.findIndex((p) => p.id === project.id);
+  if (idx >= 0) {
+    projects[idx] = project;
+  } else {
+    projects.push(project);
+  }
+  set(STORAGE_KEYS.projects, projects);
+  callDbApi('saveProject', project);
+}
+
+export function deleteProject(id: string): void {
+  const projects = getProjects().filter((p) => p.id !== id);
+  set(STORAGE_KEYS.projects, projects);
+  callDbApi('deleteProject', { id });
 }
 
 // Export all data as JSON

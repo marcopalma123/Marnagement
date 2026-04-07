@@ -5,6 +5,7 @@ import { NavigationItem } from '@/types';
 import Sidebar from '@/components/Sidebar';
 import Dashboard from '@/components/Dashboard';
 import Calendar from '@/components/Calendar';
+import Projects from '@/components/Projects';
 import Meetings from '@/components/Meetings';
 import Editor from '@/components/Editor';
 import Invoices from '@/components/Invoices';
@@ -20,10 +21,11 @@ export default function App() {
       switch (e.key) {
         case '1': setActiveNav('dashboard'); break;
         case '2': setActiveNav('calendar'); break;
-        case '3': setActiveNav('meetings'); break;
-        case '4': setActiveNav('editor'); break;
-        case '5': setActiveNav('invoices'); break;
-        case '6': setActiveNav('settings'); break;
+        case '3': setActiveNav('projects'); break;
+        case '4': setActiveNav('meetings'); break;
+        case '5': setActiveNav('editor'); break;
+        case '6': setActiveNav('invoices'); break;
+        case '7': setActiveNav('settings'); break;
       }
     };
     window.addEventListener('keydown', handler);
@@ -34,6 +36,7 @@ export default function App() {
     switch (activeNav) {
       case 'dashboard': return <Dashboard />;
       case 'calendar': return <Calendar />;
+      case 'projects': return <Projects />;
       case 'meetings': return <Meetings />;
       case 'editor': return <Editor />;
       case 'invoices': return <Invoices />;

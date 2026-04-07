@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { WorkDay, Invoice, Settings } from '@/types';
-import { getWorkDays, getInvoices, getSettings } from '@/lib/store';
+import { getWorkDays, getInvoices, getSettings, getWorkDaysRemote, getInvoicesRemote, getSettingsRemote } from '@/lib/store';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, parseISO } from 'date-fns';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -16,9 +16,17 @@ export default function Dashboard() {
   const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
-    setWorkDays(getWorkDays());
-    setInvoices(getInvoices());
-    setSettings(getSettings());
+    async function loadData() {
+      const [wd, inv, s] = await Promise.all([
+        getWorkDaysRemote(),
+        getInvoicesRemote(),
+        getSettingsRemote()
+      ]);
+      setWorkDays(wd);
+      setInvoices(inv);
+      setSettings(s || null);
+    }
+    loadData();
   }, []);
 
   const now = new Date();

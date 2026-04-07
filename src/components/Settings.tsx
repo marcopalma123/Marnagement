@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Settings, Client } from '@/types';
-import { getSettings, saveSettings, getClients, deleteClient, exportAllData, importAllData, generateId, saveClient } from '@/lib/store';
+import { getSettings, saveSettings, getClients, deleteClient, exportAllData, importAllData, generateId, saveClient, getSettingsRemote, getClientsRemote } from '@/lib/store';
 import { Settings as SettingsIcon, Download, Upload, Plus, Trash2, Save } from 'lucide-react';
 import { useRef } from 'react';
 
@@ -17,12 +17,22 @@ export default function SettingsPage() {
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientCompany, setClientCompany] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [clientPostalCode, setClientPostalCode] = useState('');
+  const [clientCountry, setClientCountry] = useState('');
   const [clientRate, setClientRate] = useState(0);
   const [clientCurrency, setClientCurrency] = useState('EUR');
 
   useEffect(() => {
-    setSettings(getSettings());
-    setClients(getClients());
+    async function loadData() {
+      const [s, c] = await Promise.all([
+        getSettingsRemote(),
+        getClientsRemote()
+      ]);
+      setSettings(s || getSettings());
+      setClients(c);
+    }
+    loadData();
   }, []);
 
   const handleSave = () => {
@@ -33,7 +43,13 @@ export default function SettingsPage() {
   };
 
   const updateSetting = <K extends keyof Settings>(key: K, value: Settings[K]) => {
-    setSettings((prev) => prev ? { ...prev, [key]: value } : prev);
+    setSettings((prev) => {
+      const updated = prev ? { ...prev, [key]: value } : prev;
+      if (updated) {
+        saveSettings(updated);
+      }
+      return updated;
+    });
   };
 
   const handleExport = () => {
@@ -67,6 +83,9 @@ export default function SettingsPage() {
       name: clientName,
       email: clientEmail,
       company: clientCompany,
+      address: clientAddress,
+      postalCode: clientPostalCode,
+      country: clientCountry,
       dailyRate: clientRate,
       currency: clientCurrency,
     };
@@ -76,6 +95,9 @@ export default function SettingsPage() {
     setClientName('');
     setClientEmail('');
     setClientCompany('');
+    setClientAddress('');
+    setClientPostalCode('');
+    setClientCountry('');
     setClientRate(0);
   };
 
@@ -121,6 +143,46 @@ export default function SettingsPage() {
               rows={2}
               placeholder="Your business address"
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Postal Code</label>
+            <input
+              type="text"
+              value={settings.businessPostalCode || ''}
+              onChange={(e) => updateSetting('businessPostalCode', e.target.value)}
+              placeholder="12345"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Country</label>
+            <input
+              type="text"
+              value={settings.businessCountry || ''}
+              onChange={(e) => updateSetting('businessCountry', e.target.value)}
+              placeholder="Country"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Phone</label>
+            <input
+              type="text"
+              value={settings.businessPhone || ''}
+              onChange={(e) => updateSetting('businessPhone', e.target.value)}
+              placeholder="+1 234 567 890"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Fiscal Number</label>
+            <input
+              type="text"
+              value={settings.businessFiscalNumber || ''}
+              onChange={(e) => updateSetting('businessFiscalNumber', e.target.value)}
+              placeholder="Tax ID / VAT"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
             />
           </div>
           <div className="col-span-2">
@@ -247,6 +309,26 @@ export default function SettingsPage() {
                 placeholder="Company (optional)"
                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
               />
+              <input
+                value={clientAddress}
+                onChange={(e) => setClientAddress(e.target.value)}
+                placeholder="Address (optional)"
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+              />
+              <div className="flex gap-2">
+                <input
+                  value={clientPostalCode}
+                  onChange={(e) => setClientPostalCode(e.target.value)}
+                  placeholder="Postal Code"
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                />
+                <input
+                  value={clientCountry}
+                  onChange={(e) => setClientCountry(e.target.value)}
+                  placeholder="Country"
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                />
+              </div>
               <div className="flex gap-2">
                 <input
                   type="number"

@@ -5,6 +5,8 @@ export interface WorkDay {
   date: string; // YYYY-MM-DD
   hoursWorked: number;
   notes: string;
+  taskName?: string;
+  projectId?: string;
   isBusinessDay: boolean;
   clientId?: string;
 }
@@ -14,6 +16,9 @@ export interface Client {
   name: string;
   email?: string;
   company?: string;
+  address?: string;
+  postalCode?: string;
+  country?: string;
   dailyRate: number;
   currency: string;
 }
@@ -32,6 +37,7 @@ export interface Meeting {
 
 export interface InvoiceItem {
   description: string;
+  taskName?: string;
   days: number;
   rate: number;
   amount: number;
@@ -48,6 +54,9 @@ export interface Invoice {
   tax: number;
   total: number;
   currency: string;
+  conversionRate: number; // exchange rate to base currency (4 decimal places)
+  receivedValue?: number; // amount received, when set marks invoice as paid
+  taxAuthorityAmount?: number; // amount sent to tax authority in EUR
   status: 'draft' | 'sent' | 'paid' | 'overdue';
   dueDate: string;
   createdAt: string;
@@ -62,6 +71,10 @@ export interface Settings {
   businessName: string;
   businessEmail: string;
   businessAddress: string;
+  businessPostalCode?: string;
+  businessCountry?: string;
+  businessPhone?: string;
+  businessFiscalNumber?: string;
   currencies: CurrencyConfig[];
   openaiApiKey?: string;
 }
@@ -87,4 +100,39 @@ export interface TemplateField {
   defaultValue?: string;
 }
 
-export type NavigationItem = 'dashboard' | 'calendar' | 'meetings' | 'editor' | 'invoices' | 'settings';
+export type NavigationItem = 'dashboard' | 'calendar' | 'projects' | 'meetings' | 'editor' | 'invoices' | 'settings';
+
+export interface SpecialDay {
+  id: string;
+  date: string; // YYYY-MM-DD
+  type: 'vacation' | 'sick' | 'holiday';
+  notes?: string;
+  createdAt: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  startDate?: string;
+  endDate?: string;
+  dateCreated: string;
+  status: 'backlog' | 'doing' | 'done';
+  isActive?: boolean;
+  statuses: ProjectStatus[];
+  tasks: Task[];
+}
+
+export interface ProjectStatus {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface Task {
+  id: string;
+  name: string;
+  description: string;
+  statusId: string;
+  createdAt: string;
+}

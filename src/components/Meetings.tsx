@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Meeting } from '@/types';
-import { getMeetings, saveMeeting, deleteMeeting, getSettings, generateId } from '@/lib/store';
+import { getMeetings, saveMeeting, deleteMeeting, getSettings, getMeetingsRemote, getSettingsRemote, generateId } from '@/lib/store';
 import { SpeechRecorder, transcribeWithWhisper, generateMeetingSummary, isAudioFile, formatDuration } from '@/lib/ai';
 import { format, parseISO } from 'date-fns';
 import { Plus, X, FileText, Upload, Trash2, Mic, MicOff, Wand2, Loader2, Volume2 } from 'lucide-react';
@@ -34,9 +34,16 @@ export default function Meetings() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setMeetings(getMeetings());
-    const s = getSettings();
-    setApiKey(s.openaiApiKey || '');
+    async function loadData() {
+      const [meetingsData, settingsData] = await Promise.all([
+        getMeetingsRemote(),
+        getSettingsRemote()
+      ]);
+      setMeetings(meetingsData);
+      const s = settingsData || getSettings();
+      setApiKey(s.openaiApiKey || '');
+    }
+    loadData();
 
     recorderRef.current = new SpeechRecorder((text) => {
       setLiveTranscript(text);
@@ -130,7 +137,7 @@ export default function Meetings() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const meeting: Meeting = {
       id: selectedMeeting?.id || generateId(),
       title: title || 'Untitled Meeting',
@@ -141,13 +148,13 @@ export default function Meetings() {
       createdAt: selectedMeeting?.createdAt || new Date().toISOString(),
     };
     saveMeeting(meeting);
-    setMeetings(getMeetings());
+    setMeetings(await getMeetingsRemote());
     resetForm();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     deleteMeeting(id);
-    setMeetings(getMeetings());
+    setMeetings(await getMeetingsRemote());
     if (selectedMeeting?.id === id) resetForm();
   };
 

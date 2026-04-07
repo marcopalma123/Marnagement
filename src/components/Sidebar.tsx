@@ -8,6 +8,7 @@ import {
   PenTool,
   Receipt,
   Settings,
+  CheckSquare,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -19,6 +20,7 @@ interface SidebarProps {
 const navItems: { id: NavigationItem; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
   { id: 'calendar', label: 'Calendar', icon: <Calendar size={18} /> },
+  { id: 'projects', label: 'Projects', icon: <CheckSquare size={18} /> },
   { id: 'meetings', label: 'Meetings', icon: <FileText size={18} /> },
   { id: 'editor', label: 'Editor', icon: <PenTool size={18} /> },
   { id: 'invoices', label: 'Invoices', icon: <Receipt size={18} /> },
