@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { WorkDay, SpecialDay, Project } from '@/types';
-import { getWorkDays, saveWorkDay, deleteWorkDay, getSpecialDays, saveSpecialDay, deleteSpecialDay, getWorkDaysRemote, getSpecialDaysRemote, getProjectsRemote, generateId } from '@/lib/store';
+import { saveWorkDay, deleteWorkDay, saveSpecialDay, deleteSpecialDay, getWorkDaysRemote, getSpecialDaysRemote, getProjectsRemote, generateId } from '@/lib/store';
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   addMonths, subMonths, isToday, isWeekend, parseISO,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, X, Palmtree, Thermometer, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Palmtree, Thermometer, CalendarDays, Plus, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 
 type DayType = 'work' | 'vacation' | 'sick' | 'holiday' | 'weekend';
@@ -19,12 +19,12 @@ export default function Calendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [editNote, setEditNote] = useState('');
-  const [editHours, setEditHours] = useState(8);
   const [dayType, setDayType] = useState<DayType>('work');
-  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [newProjectId, setNewProjectId] = useState('');
+  const [newProjectHours, setNewProjectHours] = useState(8);
   const [showInactiveProjects, setShowInactiveProjects] = useState(false);
 
-  const getProjectName = (projectId?: string) => {
+  const getProjectName = (projectId: string) => {
     if (!projectId) return '';
     const project = projects.find(p => p.id === projectId);
     return project?.name || '';
@@ -32,14 +32,11 @@ export default function Calendar() {
 
   useEffect(() => {
     async function loadData() {
-      console.log('[Calendar] Loading data...');
       const [wd, sd, proj] = await Promise.all([
         getWorkDaysRemote(),
         getSpecialDaysRemote(),
         getProjectsRemote()
       ]);
-      console.log('[Calendar] Loaded workDays:', wd);
-      console.log('[Calendar] Loaded specialDays:', sd);
       setWorkDays(wd);
       setSpecialDays(sd);
       setProjects(proj);
@@ -54,7 +51,7 @@ export default function Calendar() {
   const startPadding = (monthStart.getDay() + 6) % 7;
   const paddedDays = Array(startPadding).fill(null).concat(allDays);
 
-  const getWorkDay = (date: string) => workDays.find((d) => d.date === date);
+  const getWorkDayEntries = (date: string) => workDays.filter((d) => d.date === date);
   const getSpecialDay = (date: string) => specialDays.find((d) => d.date === date);
 
   const getDayType = (date: string): DayType => {
@@ -62,64 +59,72 @@ export default function Calendar() {
     if (specialDay) {
       return specialDay.type as DayType;
     }
-    const workDay = getWorkDay(date);
-    if (workDay?.isBusinessDay) return 'work';
+    const workEntries = getWorkDayEntries(date);
+    if (workEntries.length > 0) return 'work';
     return 'weekend';
+  };
+
+  const getTotalHours = (date: string): number => {
+    const entries = getWorkDayEntries(date);
+    return entries.reduce((sum, e) => sum + (e.hoursWorked || 0), 0);
   };
 
   const handleDayClick = (date: string) => {
     setSelectedDate(date);
-    const workDay = getWorkDay(date);
+    const workEntries = getWorkDayEntries(date);
     const specialDay = getSpecialDay(date);
     const isWeekendDay = isWeekend(parseISO(date));
 
     if (specialDay) {
       setDayType(specialDay.type as DayType);
       setEditNote(specialDay.notes || '');
-      setSelectedProject('');
-    } else if (workDay?.isBusinessDay) {
+    } else if (workEntries.length > 0) {
       setDayType('work');
-      setEditNote(workDay.notes);
-      setEditHours(workDay.hoursWorked);
-      setSelectedProject(workDay.projectId || '');
+      setEditNote(workEntries[0].notes || '');
     } else if (isWeekendDay) {
       setDayType('weekend');
       setEditNote('');
-      setSelectedProject('');
     } else {
       setDayType('work');
       setEditNote('');
-      setEditHours(8);
-      setSelectedProject('');
     }
+  };
+
+  const handleAddProject = () => {
+    if (!newProjectId || !selectedDate) return;
+    
+    const workDay: WorkDay = {
+      id: generateId(),
+      date: selectedDate,
+      projectId: newProjectId,
+      hoursWorked: newProjectHours || 8,
+      notes: editNote,
+    };
+    saveWorkDay(workDay);
+    setWorkDays(prev => [...prev, workDay]);
+    setNewProjectId('');
+    setNewProjectHours(8);
+  };
+
+  const handleUpdateEntry = (id: string, hours: number) => {
+    setWorkDays(prev => prev.map(e => 
+      e.id === id ? { ...e, hoursWorked: hours } : e
+    ));
+    const entry = workDays.find(e => e.id === id);
+    if (entry) {
+      saveWorkDay({ ...entry, hoursWorked: hours });
+    }
+  };
+
+  const handleRemoveEntry = (id: string) => {
+    deleteWorkDay(id);
+    setWorkDays(prev => prev.filter(e => e.id !== id));
   };
 
   const handleSave = async () => {
     if (!selectedDate) return;
     const dateObj = parseISO(selectedDate);
     const isWeekendDay = isWeekend(dateObj);
-
-    if (dayType === 'work' && !isWeekendDay) {
-      const workDay: WorkDay = {
-        id: getWorkDay(selectedDate)?.id || generateId(),
-        date: selectedDate,
-        hoursWorked: editHours,
-        notes: editNote,
-        projectId: selectedProject || undefined,
-        isBusinessDay: true,
-      };
-      saveWorkDay(workDay);
-      // Update local state immediately for better UX
-      setWorkDays((prev) => {
-        const filtered = prev.filter((d) => d.date !== selectedDate);
-        return [workDay, ...filtered];
-      });
-    } else {
-      const existingWorkDay = getWorkDay(selectedDate);
-      if (existingWorkDay) {
-        deleteWorkDay(existingWorkDay.id);
-      }
-    }
 
     if (dayType === 'vacation' || dayType === 'sick' || dayType === 'holiday') {
       const specialDay: SpecialDay = {
@@ -130,17 +135,10 @@ export default function Calendar() {
         createdAt: getSpecialDay(selectedDate)?.createdAt || new Date().toISOString(),
       };
       saveSpecialDay(specialDay);
-      // Update local state immediately for better UX
-      setSpecialDays((prev) => {
-        const filtered = prev.filter((d) => d.date !== selectedDate);
+      setSpecialDays(prev => {
+        const filtered = prev.filter(d => d.date !== selectedDate);
         return [specialDay, ...filtered];
       });
-    } else {
-      const existingSpecial = getSpecialDay(selectedDate);
-      if (existingSpecial) {
-        deleteSpecialDay(existingSpecial.id);
-        setSpecialDays((prev) => prev.filter((d) => d.id !== existingSpecial.id));
-      }
     }
 
     setSelectedDate(null);
@@ -148,22 +146,26 @@ export default function Calendar() {
 
   const handleDelete = async () => {
     if (!selectedDate) return;
-    const workDay = getWorkDay(selectedDate);
+    const workEntries = getWorkDayEntries(selectedDate);
     const specialDay = getSpecialDay(selectedDate);
-    if (workDay) {
-      deleteWorkDay(workDay.id);
-      setWorkDays((prev) => prev.filter((d) => d.id !== workDay.id));
+    
+    for (const entry of workEntries) {
+      deleteWorkDay(entry.id);
     }
+    setWorkDays(prev => prev.filter(e => e.date !== selectedDate));
+    
     if (specialDay) {
       deleteSpecialDay(specialDay.id);
-      setSpecialDays((prev) => prev.filter((d) => d.id !== specialDay.id));
+      setSpecialDays(prev => prev.filter(d => d.id !== specialDay.id));
     }
     setSelectedDate(null);
   };
 
   const thisMonthWorked = workDays.filter(
-    (d) => d.date.startsWith(format(currentMonth, 'yyyy-MM')) && d.isBusinessDay
+    (d) => d.date.startsWith(format(currentMonth, 'yyyy-MM'))
   );
+
+  const thisMonthHours = thisMonthWorked.reduce((sum, d) => sum + (d.hoursWorked || 0), 0);
 
   const getDayIndicator = (type: DayType) => {
     switch (type) {
@@ -180,13 +182,15 @@ export default function Calendar() {
     }
   };
 
+  const dayEntries = selectedDate ? getWorkDayEntries(selectedDate) : [];
+
   return (
     <div className="animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Calendar</h2>
           <p className="text-sm text-gray-400 mt-1">
-            {thisMonthWorked.length} business days worked this month
+            {thisMonthWorked.length} entries · {thisMonthHours}h this month
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -208,7 +212,6 @@ export default function Calendar() {
         </div>
       </div>
 
-      {/* Legend */}
       <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
         <div className="flex items-center gap-1">
           <div className="w-2 h-2 rounded-full bg-blue-500" />
@@ -228,7 +231,6 @@ export default function Calendar() {
         </div>
       </div>
 
-      {/* Calendar grid */}
       <div className="mt-4 bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="grid grid-cols-7 border-b border-gray-200">
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
@@ -245,6 +247,8 @@ export default function Calendar() {
             const dateStr = format(day, 'yyyy-MM-dd');
             const type = getDayType(dateStr);
             const isWeekendDay = isWeekend(day);
+            const dayEntries = getWorkDayEntries(dateStr);
+            const totalHrs = getTotalHours(dateStr);
 
             return (
               <button
@@ -265,12 +269,29 @@ export default function Calendar() {
                   {format(day, 'd')}
                 </span>
                 {type !== 'weekend' && (
-                  <div className="mt-1 flex items-center gap-1">
-                    {getDayIndicator(type)}
-                    {type === 'work' && (
-                      <p className="text-[10px] text-gray-400 font-mono">
-                        {getWorkDay(dateStr)?.hoursWorked || 8}h{getWorkDay(dateStr)?.projectId ? ` - ${getProjectName(getWorkDay(dateStr)?.projectId)}` : ''}
-                      </p>
+                  <div className="mt-1 space-y-0.5">
+                    {type === 'work' && dayEntries.length > 0 ? (
+                      dayEntries.slice(0, 2).map((entry, idx) => (
+                        <div key={idx} className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                          <span className="text-[9px] text-gray-500 truncate max-w-[60px]">
+                            {getProjectName(entry.projectId).slice(0, 8)}
+                          </span>
+                          <span className="text-[9px] text-gray-400 font-mono">
+                            {entry.hoursWorked}h
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        {getDayIndicator(type)}
+                        {type === 'work' && (
+                          <span className="text-[10px] text-gray-400 font-mono">{totalHrs}h</span>
+                        )}
+                      </div>
+                    )}
+                    {dayEntries.length > 2 && (
+                      <p className="text-[8px] text-gray-400">+{dayEntries.length - 2} more</p>
                     )}
                   </div>
                 )}
@@ -280,7 +301,6 @@ export default function Calendar() {
         </div>
       </div>
 
-      {/* Edit panel */}
       {selectedDate && (
         <div className="mt-4 bg-white border border-gray-200 rounded-xl p-5 animate-slide-up">
           <div className="flex items-center justify-between mb-4">
@@ -293,7 +313,6 @@ export default function Calendar() {
           </div>
 
           <div className="space-y-4">
-            {/* Day type selector */}
             <div>
               <label className="text-xs text-gray-400 block mb-2">Day type</label>
               <div className="flex flex-wrap gap-2">
@@ -326,7 +345,7 @@ export default function Calendar() {
             {dayType === 'work' && (
               <>
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">Project</label>
+                  <label className="text-xs text-gray-400 block mb-2">Project Time Entries</label>
                   <label className="flex items-center gap-2 mb-2 text-xs text-gray-500">
                     <input
                       type="checkbox"
@@ -334,18 +353,73 @@ export default function Calendar() {
                       onChange={(e) => setShowInactiveProjects(e.target.checked)}
                       className="rounded border-gray-300"
                     />
-                    Show inactive projects
+                    Show inactive
                   </label>
-                  <select
-                    value={selectedProject}
-                    onChange={(e) => setSelectedProject(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
-                  >
-                    <option value="">No project</option>
-                    {projects.filter(p => p.isActive !== false || showInactiveProjects).map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}{p.isActive === false ? ' (inactive)' : ''}</option>
+                  
+                  <div className="space-y-2 mb-3">
+                    {dayEntries.map((entry) => (
+                      <div key={entry.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                        <span className="flex-1 text-sm">{getProjectName(entry.projectId)}</span>
+                        <input
+                          type="number"
+                          step={0.5}
+                          min={0}
+                          max={24}
+                          value={entry.hoursWorked}
+                          onChange={(e) => handleUpdateEntry(entry.id, parseFloat(e.target.value) || 0)}
+                          className="w-16 px-2 py-1 border border-gray-200 rounded text-sm font-mono text-center"
+                        />
+                        <span className="text-xs text-gray-400">h</span>
+                        <button
+                          onClick={() => handleRemoveEntry(entry.id)}
+                          className="p-1 text-gray-400 hover:text-red-500"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     ))}
-                  </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={newProjectId}
+                      onChange={(e) => setNewProjectId(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                    >
+                      <option value="">Add project...</option>
+                      {projects
+                        .filter(p => p.isActive !== false || showInactiveProjects)
+                        .filter(p => !dayEntries.some(e => e.projectId === p.id))
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                    <input
+                      type="number"
+                      step={0.5}
+                      min={0}
+                      max={24}
+                      value={newProjectHours}
+                      onChange={(e) => setNewProjectHours(parseFloat(e.target.value) || 0)}
+                      className="w-20 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono text-center"
+                    />
+                    <button
+                      onClick={handleAddProject}
+                      disabled={!newProjectId}
+                      className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+
+                  {dayEntries.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      <span className="text-xs text-gray-500">Total: </span>
+                      <span className="text-sm font-mono font-medium">
+                        {getTotalHours(selectedDate)}h
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -354,7 +428,7 @@ export default function Calendar() {
                     value={editNote}
                     onChange={(e) => setEditNote(e.target.value)}
                     placeholder="What did you work on?"
-                    rows={3}
+                    rows={2}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
                   />
                 </div>
@@ -381,7 +455,7 @@ export default function Calendar() {
               >
                 Save
               </button>
-              {(getWorkDay(selectedDate) || getSpecialDay(selectedDate)) && (
+              {(dayEntries.length > 0 || getSpecialDay(selectedDate)) && (
                 <button
                   onClick={handleDelete}
                   className="px-4 py-2 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50"
