@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: marnagement
+    env: node
+    plan: starter
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 20

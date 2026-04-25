@@ -2,6 +2,9 @@
   "name": "marnagement",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20 <23"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,8 +13,11 @@
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@neondatabase/serverless": "^1.0.2",
     "@react-pdf/renderer": "^3.4.5",
+    "@trigger.dev/sdk": "^4.4.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "jspdf": "^4.2.1",
