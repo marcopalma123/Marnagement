@@ -4,6 +4,8 @@ export interface WorkDay {
   id: string;
   date: string; // YYYY-MM-DD
   projectId: string;
+  clientId?: string;
+  taskName?: string;
   hoursWorked: number;
   notes?: string;
   isBusinessDay?: boolean;
