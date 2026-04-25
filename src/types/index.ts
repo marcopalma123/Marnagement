@@ -3,12 +3,10 @@
 export interface WorkDay {
   id: string;
   date: string; // YYYY-MM-DD
+  projectId: string;
   hoursWorked: number;
-  notes: string;
-  taskName?: string;
-  projectId?: string;
-  isBusinessDay: boolean;
-  clientId?: string;
+  notes?: string;
+  isBusinessDay?: boolean;
 }
 
 export interface Client {
@@ -41,7 +39,7 @@ export interface InvoiceItem {
   days: number;
   rate: number;
   amount: number;
-  notes: string;
+  notes?: string;
 }
 
 export interface Invoice {
@@ -100,7 +98,7 @@ export interface TemplateField {
   defaultValue?: string;
 }
 
-export type NavigationItem = 'dashboard' | 'calendar' | 'projects' | 'meetings' | 'editor' | 'invoices' | 'settings';
+export type NavigationItem = 'dashboard' | 'calendar' | 'projects' | 'meetings' | 'editor' | 'invoices' | 'telegram' | 'triggers' | 'settings';
 
 export interface SpecialDay {
   id: string;
