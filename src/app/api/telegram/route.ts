@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { pollTelegram } from "@/lib/telegram-polling";
+import { NextRequest } from "next/server";
+import { getCurrentUserFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +15,12 @@ async function checkForNewMessages() {
   return lastMessages;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const user = await getCurrentUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const messages = await checkForNewMessages();
     return NextResponse.json({ messages });

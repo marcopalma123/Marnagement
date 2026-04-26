@@ -136,3 +136,10 @@ export interface Task {
   statusId: string;
   createdAt: string;
 }
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}

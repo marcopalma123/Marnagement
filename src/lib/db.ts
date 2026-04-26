@@ -4,6 +4,23 @@ let db: any = null;
 let dbChecked = false;
 let tablesInitialized = false;
 
+export interface AuthUserRecord {
+  id: string;
+  email: string;
+  passwordHash: string;
+  name: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface AuthSessionRecord {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
 function getDb() {
   if (db) return db;
   if (dbChecked) return null;
@@ -207,6 +224,34 @@ async function initializeTables() {
         name TEXT
       )
     `;
+
+    await database`
+      CREATE TABLE IF NOT EXISTS auth_users (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        name TEXT NOT NULL DEFAULT '',
+        role TEXT NOT NULL DEFAULT 'user',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `;
+
+    await database`
+      CREATE TABLE IF NOT EXISTS auth_sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+        token_hash TEXT NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `;
+
+    try {
+      await database`CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(user_id)`;
+    } catch {}
+    try {
+      await database`CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires_at ON auth_sessions(expires_at)`;
+    } catch {}
 
     try {
       await database`ALTER TABLE projects ADD COLUMN created_at TEXT NOT NULL DEFAULT NOW()`;
@@ -680,4 +725,151 @@ export async function setTimerStateDb(id: string, running: boolean, startedAt: s
   } catch (err) {
     console.error('[DB] Timer state error:', err);
   }
+}
+
+// Auth
+export async function hasAuthUsersDb(): Promise<boolean> {
+  const database = getDb();
+  if (!database) throw new Error('Database connection unavailable');
+
+  await initializeTables();
+  const rows = await database`SELECT COUNT(*)::int AS count FROM auth_users`;
+  return (rows[0]?.count || 0) > 0;
+}
+
+export async function getAuthUserByEmailDb(email: string): Promise<AuthUserRecord | null> {
+  const database = getDb();
+  if (!database) throw new Error('Database connection unavailable');
+
+  await initializeTables();
+  const rows = await database`SELECT * FROM auth_users WHERE email = ${email.toLowerCase()} LIMIT 1`;
+  if (rows.length === 0) return null;
+
+  const row = rows[0];
+  return {
+    id: row.id,
+    email: row.email,
+    passwordHash: row.password_hash,
+    name: row.name || '',
+    role: row.role || 'user',
+    createdAt: row.created_at,
+  };
+}
+
+export async function getAuthUserByIdDb(id: string): Promise<AuthUserRecord | null> {
+  const database = getDb();
+  if (!database) throw new Error('Database connection unavailable');
+
+  await initializeTables();
+  const rows = await database`SELECT * FROM auth_users WHERE id = ${id} LIMIT 1`;
+  if (rows.length === 0) return null;
+
+  const row = rows[0];
+  return {
+    id: row.id,
+    email: row.email,
+    passwordHash: row.password_hash,
+    name: row.name || '',
+    role: row.role || 'user',
+    createdAt: row.created_at,
+  };
+}
+
+export async function createAuthUserDb(user: {
+  id: string;
+  email: string;
+  passwordHash: string;
+  name?: string;
+  role?: string;
+}): Promise<void> {
+  const database = getDb();
+  if (!database) throw new Error('Database connection unavailable');
+
+  await initializeTables();
+  await database`
+    INSERT INTO auth_users (id, email, password_hash, name, role)
+    VALUES (${user.id}, ${user.email.toLowerCase()}, ${user.passwordHash}, ${user.name || ''}, ${user.role || 'user'})
+  `;
+}
+
+export async function createAuthSessionDb(session: {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+}): Promise<void> {
+  const database = getDb();
+  if (!database) throw new Error('Database connection unavailable');
+
+  await initializeTables();
+  await database`
+    INSERT INTO auth_sessions (id, user_id, token_hash, expires_at)
+    VALUES (${session.id}, ${session.userId}, ${session.tokenHash}, ${session.expiresAt})
+  `;
+}
+
+export async function getAuthSessionWithUserByTokenHashDb(tokenHash: string): Promise<{
+  session: AuthSessionRecord;
+  user: AuthUserRecord;
+} | null> {
+  const database = getDb();
+  if (!database) throw new Error('Database connection unavailable');
+
+  await initializeTables();
+  const rows = await database`
+    SELECT
+      s.id AS session_id,
+      s.user_id AS session_user_id,
+      s.token_hash AS session_token_hash,
+      s.expires_at AS session_expires_at,
+      s.created_at AS session_created_at,
+      u.id AS user_id,
+      u.email AS user_email,
+      u.password_hash AS user_password_hash,
+      u.name AS user_name,
+      u.role AS user_role,
+      u.created_at AS user_created_at
+    FROM auth_sessions s
+    JOIN auth_users u ON u.id = s.user_id
+    WHERE s.token_hash = ${tokenHash}
+      AND s.expires_at > NOW()
+    LIMIT 1
+  `;
+
+  if (rows.length === 0) return null;
+  const row = rows[0];
+
+  return {
+    session: {
+      id: row.session_id,
+      userId: row.session_user_id,
+      tokenHash: row.session_token_hash,
+      expiresAt: row.session_expires_at,
+      createdAt: row.session_created_at,
+    },
+    user: {
+      id: row.user_id,
+      email: row.user_email,
+      passwordHash: row.user_password_hash,
+      name: row.user_name || '',
+      role: row.user_role || 'user',
+      createdAt: row.user_created_at,
+    },
+  };
+}
+
+export async function deleteAuthSessionByTokenHashDb(tokenHash: string): Promise<void> {
+  const database = getDb();
+  if (!database) throw new Error('Database connection unavailable');
+
+  await initializeTables();
+  await database`DELETE FROM auth_sessions WHERE token_hash = ${tokenHash}`;
+}
+
+export async function deleteExpiredAuthSessionsDb(): Promise<void> {
+  const database = getDb();
+  if (!database) throw new Error('Database connection unavailable');
+
+  await initializeTables();
+  await database`DELETE FROM auth_sessions WHERE expires_at <= NOW()`;
 }

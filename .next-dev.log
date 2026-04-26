@@ -8,6 +8,6 @@
    - Environments: .env.local
 
  ✓ Starting...
- ✓ Ready in 2.6s
+ ✓ Ready in 2.5s
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
  ○ Compiling / ...
- ✓ Compiled / in 4s (2008 modules)

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as db from '@/lib/db';
+import { getCurrentUserFromRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
+  const user = await getCurrentUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const type = searchParams.get('type');
   
@@ -35,6 +41,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const user = await getCurrentUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { action, data } = body;

@@ -35,6 +35,10 @@ async function callDbApi<T>(action: string, data?: unknown): Promise<T | null> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, data }),
     });
+    if (response.status === 401 && typeof window !== 'undefined') {
+      window.location.href = '/login';
+      return null;
+    }
     if (!response.ok) return null;
     const result = await response.json();
     return result as T;
@@ -47,6 +51,10 @@ async function fetchFromDb<T>(type: string): Promise<T | null> {
   try {
     console.log('[fetchFromDb] fetching type:', type);
     const response = await fetch('/api/db?type=' + type);
+    if (response.status === 401 && typeof window !== 'undefined') {
+      window.location.href = '/login';
+      return null;
+    }
     if (!response.ok) {
       console.log('[fetchFromDb] response not ok:', response.status);
       return null;
