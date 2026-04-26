@@ -27,6 +27,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.mobile-safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.mobile-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 .font-mono {
   font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
   font-variant-numeric: tabular-nums;

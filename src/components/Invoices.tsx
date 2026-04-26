@@ -281,7 +281,7 @@ export default function Invoices() {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Invoices</h2>
           <p className="text-sm text-gray-400 mt-1">
@@ -290,7 +290,7 @@ export default function Invoices() {
         </div>
         <button
           onClick={() => { setShowCreate(true); setEditingInvoice(null); setManualInvoiceNumber(''); }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+          className="inline-flex w-full items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 sm:w-auto"
         >
           <Plus size={16} /> Generate Invoice
         </button>
@@ -306,7 +306,7 @@ export default function Invoices() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="text-xs text-gray-400 block mb-1">Month</label>
               <input
@@ -453,8 +453,8 @@ export default function Invoices() {
 
               return (
                 <div key={inv.id} className="bg-white border border-gray-200 rounded-xl p-4 card-hover">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium font-mono">{inv.invoiceNumber}</p>
                         <span className={clsx('text-xs px-2 py-0.5 rounded-full flex items-center gap-1', st.bg, st.color)}>
@@ -465,12 +465,12 @@ export default function Invoices() {
                         {client?.name || 'No client'} · {format(parseISO(`${inv.month}-01`), 'MMM yyyy')} · Due {format(parseISO(inv.dueDate), 'MMM d')}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="w-full sm:w-auto sm:min-w-[280px] sm:text-right">
                       <p className="text-lg font-semibold font-mono tabular-nums">{cSymbol}{inv.total.toFixed(2)}</p>
                       {inv.receivedValue !== undefined && inv.receivedValue > 0 && (
                         <p className="text-xs text-emerald-600 font-mono">Received: {cSymbol}{inv.receivedValue.toFixed(2)}</p>
                       )}
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="mt-2 flex flex-wrap items-center gap-2 sm:justify-end">
                         <div className="flex items-center gap-1">
                           <span className="text-xs text-gray-400">{cSymbol}</span>
                           <input
@@ -488,7 +488,7 @@ export default function Invoices() {
                               setInvoices((prev) => prev.map((i) => i.id === inv.id ? updated : i));
                               saveInvoice(updated);
                             }}
-                            className="w-20 text-xs border border-gray-200 rounded px-2 py-1 font-mono focus:outline-none"
+                            className="w-24 text-xs border border-gray-200 rounded px-2 py-1 font-mono focus:outline-none"
                             placeholder="0.00"
                           />
                         </div>
