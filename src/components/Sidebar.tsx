@@ -9,6 +9,8 @@ import {
   Receipt,
   Settings,
   CheckSquare,
+  MessageCircle,
+  Zap,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -24,6 +26,8 @@ const navItems: { id: NavigationItem; label: string; icon: React.ReactNode }[] =
   { id: 'meetings', label: 'Meetings', icon: <FileText size={18} /> },
   { id: 'editor', label: 'Editor', icon: <PenTool size={18} /> },
   { id: 'invoices', label: 'Invoices', icon: <Receipt size={18} /> },
+  { id: 'telegram', label: 'Telegram', icon: <MessageCircle size={18} /> },
+  { id: 'triggers', label: 'Triggers', icon: <Zap size={18} /> },
   { id: 'settings', label: 'Settings', icon: <Settings size={18} /> },
 ];
 

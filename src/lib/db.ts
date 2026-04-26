@@ -10,19 +10,25 @@ function getDb() {
   
   const databaseUrl = process.env.DATABASE_URL;
   
-  console.log('[DB] DATABASE_URL exists:', !!databaseUrl);
+  console.log('[DB] DATABASE_URL exists:', !!databaseUrl, 'length:', databaseUrl?.length);
   
   if (!databaseUrl) {
     dbChecked = true;
     return null;
   }
   
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { neon } = require('@neondatabase/serverless');
-  console.log('[DB] Neon initialized');
-  db = neon(databaseUrl);
-  dbChecked = true;
-  return db;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { neon } = require('@neondatabase/serverless');
+    console.log('[DB] Neon initialized');
+    db = neon(databaseUrl);
+    dbChecked = true;
+    return db;
+  } catch (err) {
+    console.error('[DB] Neon init error:', err);
+    dbChecked = true;
+    return null;
+  }
 }
 
 async function initializeTables() {
@@ -41,20 +47,19 @@ async function initializeTables() {
       CREATE TABLE IF NOT EXISTS work_days (
         id TEXT PRIMARY KEY,
         date TEXT NOT NULL,
+        project_id TEXT,
         hours_worked REAL NOT NULL,
         notes TEXT,
-        task_name TEXT,
-        project_id TEXT,
-        is_business_day BOOLEAN NOT NULL,
-        client_id TEXT
+        is_business_day BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW()
       )
     `;
 
     try {
-      await database`ALTER TABLE work_days ADD COLUMN task_name TEXT`;
+      await database`ALTER TABLE work_days ADD COLUMN created_at TIMESTAMP DEFAULT NOW()`;
     } catch {}
     try {
-      await database`ALTER TABLE work_days ADD COLUMN project_id TEXT`;
+      await database`ALTER TABLE work_days ADD COLUMN is_business_day BOOLEAN DEFAULT true`;
     } catch {}
     
     await database`
@@ -194,6 +199,15 @@ async function initializeTables() {
       )
     `;
 
+    await database`
+      CREATE TABLE IF NOT EXISTS timer_state (
+        id TEXT PRIMARY KEY,
+        running BOOLEAN NOT NULL DEFAULT false,
+        started_at TEXT,
+        name TEXT
+      )
+    `;
+
     try {
       await database`ALTER TABLE projects ADD COLUMN created_at TEXT NOT NULL DEFAULT NOW()`;
     } catch {}
@@ -234,16 +248,14 @@ export async function getWorkDaysDb(): Promise<WorkDay[]> {
   if (!database) return [];
   
   await initializeTables();
-  const rows = await database`SELECT * FROM work_days ORDER BY date DESC`;
+  const rows = await database`SELECT * FROM work_days ORDER BY date DESC, created_at ASC`;
   return rows.map((row: any) => ({
     id: row.id,
     date: row.date,
-    hoursWorked: row.hours_worked,
-    notes: row.notes || '',
-    taskName: row.task_name || '',
     projectId: row.project_id || '',
-    isBusinessDay: row.is_business_day,
-    clientId: row.client_id,
+    hoursWorked: row.hours_worked || 0,
+    notes: row.notes || '',
+    isBusinessDay: row.is_business_day ?? true,
   }));
 }
 
@@ -253,16 +265,8 @@ export async function saveWorkDayDb(day: WorkDay): Promise<void> {
   
   await initializeTables();
   await database`
-    INSERT INTO work_days (id, date, hours_worked, notes, task_name, project_id, is_business_day, client_id)
-    VALUES (${day.id}, ${day.date}, ${day.hoursWorked}, ${day.notes}, ${day.taskName || ''}, ${day.projectId || ''}, ${day.isBusinessDay}, ${day.clientId})
-    ON CONFLICT (id) DO UPDATE SET
-      date = ${day.date},
-      hours_worked = ${day.hoursWorked},
-      notes = ${day.notes},
-      task_name = ${day.taskName || ''},
-      project_id = ${day.projectId || ''},
-      is_business_day = ${day.isBusinessDay},
-      client_id = ${day.clientId}
+    INSERT INTO work_days (id, date, project_id, hours_worked, notes, is_business_day)
+    VALUES (${day.id}, ${day.date}, ${day.projectId}, ${day.hoursWorked}, ${day.notes || ''}, true)
   `;
 }
 
@@ -607,4 +611,73 @@ export async function deleteProjectDb(id: string): Promise<void> {
   if (!database) return;
   
   await database`DELETE FROM projects WHERE id = ${id}`;
+}
+
+// Timer State
+export interface TimerState {
+  id: string;
+  running: boolean;
+  startedAt: string | null;
+  name: string;
+}
+
+export async function getTimerStatesDb(): Promise<TimerState[]> {
+  const database = getDb();
+  if (!database) return [];
+  
+  await initializeTables();
+  
+  try {
+    await database`DELETE FROM timer_state WHERE id = 'default'`;
+  } catch {}
+  
+  try {
+    const rows = await database`SELECT * FROM timer_state ORDER BY started_at DESC`;
+    return rows.map((row: any) => ({
+      id: row.id,
+      running: row.running || false,
+      startedAt: row.started_at || null,
+      name: row.name || '',
+    }));
+  } catch (err) {
+    console.error('[DB] Failed to get timer states:', err);
+    return [];
+  }
+}
+
+export async function getTimerStateDb(id: string): Promise<TimerState | null> {
+  const database = getDb();
+  if (!database) return null;
+  
+  await initializeTables();
+  const rows = await database`SELECT * FROM timer_state WHERE id = ${id}`;
+  if (rows.length === 0) return null;
+  
+  return {
+    id: rows[0].id,
+    running: rows[0].running || false,
+    startedAt: rows[0].started_at || null,
+    name: rows[0].name || '',
+  };
+}
+
+export async function setTimerStateDb(id: string, running: boolean, startedAt: string | null, name: string = ''): Promise<void> {
+  const database = getDb();
+  if (!database) return;
+  
+  await initializeTables();
+  
+  try {
+    if (!running && startedAt === null) {
+      await database`DELETE FROM timer_state WHERE id = ${id}`;
+    } else {
+      await database`DELETE FROM timer_state WHERE id = ${id}`;
+      await database`
+        INSERT INTO timer_state (id, running, started_at, name)
+        VALUES (${id}, ${running}, ${startedAt}, ${name})
+      `;
+    }
+  } catch (err) {
+    console.error('[DB] Timer state error:', err);
+  }
 }

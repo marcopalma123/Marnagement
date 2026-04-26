@@ -73,8 +73,8 @@ export default function Invoices() {
     };
 
     const items: InvoiceItem[] = monthDays.map((day) => ({
-      description: `${format(parseISO(day.date), 'EEE, MMM d')} — ${day.notes || 'Work'}`,
-      taskName: getProjectName(day.projectId),
+      description: getProjectName(day.projectId),
+      taskName: '',
       days: 1,
       rate: dailyRate,
       amount: dailyRate * (day.hoursWorked / 8),

@@ -10,6 +10,8 @@ import Meetings from '@/components/Meetings';
 import Editor from '@/components/Editor';
 import Invoices from '@/components/Invoices';
 import SettingsPage from '@/components/Settings';
+import TelegramMessage from '@/components/TelegramMessage';
+import Triggers from '@/components/Triggers';
 
 export default function App() {
   const [activeNav, setActiveNav] = useState<NavigationItem>('dashboard');
@@ -25,7 +27,9 @@ export default function App() {
         case '4': setActiveNav('meetings'); break;
         case '5': setActiveNav('editor'); break;
         case '6': setActiveNav('invoices'); break;
-        case '7': setActiveNav('settings'); break;
+        case '7': setActiveNav('telegram'); break;
+        case '8': setActiveNav('triggers'); break;
+        case '9': setActiveNav('settings'); break;
       }
     };
     window.addEventListener('keydown', handler);
@@ -40,6 +44,8 @@ export default function App() {
       case 'meetings': return <Meetings />;
       case 'editor': return <Editor />;
       case 'invoices': return <Invoices />;
+      case 'telegram': return <TelegramMessage />;
+      case 'triggers': return <Triggers />;
       case 'settings': return <SettingsPage />;
     }
   }, [activeNav]);

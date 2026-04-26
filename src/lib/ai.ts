@@ -3,6 +3,54 @@
 // 1. Web Speech API (browser built-in, real-time, zero cost)
 // 2. OpenAI Whisper API (whisper-1 model, free tier)
 
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
+
+let ffmpeg: FFmpeg | null = null;
+let ffmpegLoaded = false;
+
+async function loadFFmpeg(): Promise<FFmpeg> {
+  if (ffmpegLoaded && ffmpeg) return ffmpeg;
+  
+  ffmpeg = new FFmpeg();
+  
+  ffmpeg.on('log', ({ message }) => {
+    console.log('[FFmpeg]', message);
+  });
+  
+  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+  });
+  
+  ffmpegLoaded = true;
+  return ffmpeg;
+}
+
+export async function convertMp4ToMp3(file: File): Promise<File> {
+  try {
+    const ff = await loadFFmpeg();
+    
+    const inputName = 'input.mp4';
+    const outputName = 'output.mp3';
+    
+    await ff.writeFile(inputName, await fetchFile(file));
+    await ff.exec(['-i', inputName, '-q:a', '2', '-map', 'a', outputName]);
+    
+    const data = await ff.readFile(outputName);
+    
+    await ff.deleteFile(inputName);
+    await ff.deleteFile(outputName);
+    
+    const blob = new Blob([data as unknown as BlobPart], { type: 'audio/mp3' });
+    return new File([blob], file.name.replace(/\.mp4$/i, '.mp3'), { type: 'audio/mp3' });
+  } catch (err) {
+    console.error('FFmpeg conversion error:', err);
+    throw new Error('Failed to convert MP4 to MP3. Please ensure the file is a valid video file.');
+  }
+}
+
 export interface TranscriptionResult {
   text: string;
   confidence?: number;

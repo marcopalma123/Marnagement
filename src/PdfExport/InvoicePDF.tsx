@@ -377,32 +377,7 @@ export default function InvoicePDF({ data = {} }: Props) {
           </View>
         ))}
 
-        {/* ── Totals row ── */}
-        <View style={s.totalsRow}>
-          <View style={s.paymentTermsBlock}>
-            <Text style={s.paymentTermsLabel}>Payment Terms:</Text>
-            <Text style={s.paymentTermsValue}>{inv.paymentTerms}</Text>
-          </View>
-          <View style={s.totalAmountBlock}>
-            <Text style={s.totalAmountLabel}>Total Amount Due:</Text>
-            <Text style={s.totalAmountValue}>{fmt(subtotal)}</Text>
-          </View>
-        </View>
-
-        {/* ── Bottom ── */}
-        <View style={s.bottomRow}>
-          <View style={s.termsBlock}>
-            <Text style={s.termsTitle}>Terms and Conditions</Text>
-            <Text style={s.termsText}>{inv.termsAndConditions}</Text>
-          </View>
-          <View style={s.paymentBlock}>
-            <Text style={s.paymentTitle}>Send Payment To:</Text>
-            <Text style={s.paymentLine}>{inv.bankAccountName}</Text>
-            <Text style={s.paymentLine}>{inv.bankName}</Text>
-            <Text style={s.paymentLine}>{inv.bankAccountNumber}</Text>
-            <Text style={s.paymentLine}>{inv.otherBankInfo}</Text>
-          </View>
-        </View>
+   
       </Page>
     </Document>
   );

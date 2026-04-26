@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Meeting } from '@/types';
 import { getMeetings, saveMeeting, deleteMeeting, getSettings, getMeetingsRemote, getSettingsRemote, generateId } from '@/lib/store';
-import { SpeechRecorder, transcribeWithWhisper, generateMeetingSummary, isAudioFile, formatDuration } from '@/lib/ai';
+import { SpeechRecorder, transcribeWithWhisper, generateMeetingSummary, isAudioFile, formatDuration, convertMp4ToMp3 } from '@/lib/ai';
 import { format, parseISO } from 'date-fns';
 import { Plus, X, FileText, Upload, Trash2, Mic, MicOff, Wand2, Loader2, Volume2 } from 'lucide-react';
 import clsx from 'clsx';
@@ -90,7 +90,23 @@ export default function Meetings() {
   const handleFileUpload = async (file: File) => {
     setError('');
 
-    if (isAudioFile(file)) {
+    let audioFile = file;
+    
+    // Convert MP4 to MP3 if needed
+    if (file.name.toLowerCase().endsWith('.mp4')) {
+      setIsTranscribing(true);
+      try {
+        setError('Converting MP4 to MP3...');
+        audioFile = await convertMp4ToMp3(file);
+        setError('');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'MP4 conversion failed');
+        setIsTranscribing(false);
+        return;
+      }
+    }
+
+    if (isAudioFile(audioFile)) {
       if (!apiKey) {
         setError('OpenAI API key required for audio transcription. Add it in Settings.');
         return;
@@ -98,7 +114,7 @@ export default function Meetings() {
 
       setIsTranscribing(true);
       try {
-        const result = await transcribeWithWhisper(file, apiKey);
+        const result = await transcribeWithWhisper(audioFile, apiKey);
         setRawText(result.text);
         setTitle(file.name.replace(/\.[^.]+$/, ''));
       } catch (err: unknown) {

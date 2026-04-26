@@ -191,7 +191,7 @@ export function generateInvoicePdf(data: Partial<InvoiceData>): Buffer {
     doc.setFontSize(9);
     doc.setTextColor(TEXT_MID);
     x = margin + 3;
-    const projectHeader = item.taskName ? `[${item.taskName}] ` : '';
+    const projectHeader = item.taskName ? `${item.taskName} ` : '';
     const displayText = projectHeader + item.description;
     const descText = doc.splitTextToSize(displayText, colWidths.description - 5);
     doc.text(descText[0], x, y + 3);
@@ -217,21 +217,9 @@ export function generateInvoicePdf(data: Partial<InvoiceData>): Buffer {
 
   y += 20;
 
-  doc.setFontSize(8);
-  doc.setTextColor(TEXT_MID);
-  doc.text("Payment Terms:", margin, y);
-  doc.text(`Net ${inv.paymentTerms}`, margin + 30, y);
+
 
   y += 15;
-
-  doc.setFontSize(9);
-  doc.setTextColor(TEXT_DARK);
-  doc.text("Terms and Conditions", margin, y);
-  y += 5;
-  doc.setFontSize(8);
-  doc.setTextColor(TEXT_MID);
-  const terms = doc.splitTextToSize(inv.termsAndConditions, contentWidth * 0.45);
-  doc.text(terms, margin, y);
 
   doc.setFontSize(9);
   doc.setTextColor(TEXT_DARK);
