@@ -1,6 +1,6 @@
 import { getWorkDaysDb } from "./db";
 
-export async function checkConsecutiveEmptyDays() {
+export async function checkConsecutiveEmptyDays(userId: string) {
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
@@ -15,7 +15,7 @@ export async function checkConsecutiveEmptyDays() {
   const todayStr = formatDate(today);
   const yesterdayStr = formatDate(yesterday);
 
-  const records = await getWorkDaysDb();
+  const records = await getWorkDaysDb(userId);
 
   const datesWithData = new Set(records.map((r) => r.date));
 

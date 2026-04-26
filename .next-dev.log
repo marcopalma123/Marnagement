@@ -8,6 +8,5 @@
    - Environments: .env.local
 
  ✓ Starting...
- ✓ Ready in 2.5s
- ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Ready in 2.6s
  ○ Compiling / ...
