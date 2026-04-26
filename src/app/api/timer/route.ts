@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { checkConsecutiveEmptyDays } from "@/lib/calendar-checks";
 import { sendAlertService } from "@/lib/alert-service";
 import { getTimerStatesDb, setTimerStateDb } from "@/lib/db";
+import { getCurrentUserFromRequest } from "@/lib/auth";
 
 interface TimerInstance {
   intervalId: NodeJS.Timeout;
@@ -122,7 +123,12 @@ async function syncTimerStates() {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const user = await getCurrentUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   await syncTimerStates();
   
   const activeTimers = Array.from(timers.entries()).map(([id, timer]) => ({
@@ -137,6 +143,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const user = await getCurrentUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const body = await request.json().catch(() => ({}));
   const name = body.name || '';
   
@@ -145,6 +156,11 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const user = await getCurrentUserFromRequest(request);
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
   

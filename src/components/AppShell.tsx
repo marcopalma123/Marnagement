@@ -26,6 +26,7 @@ import {
   X,
 } from 'lucide-react';
 import clsx from 'clsx';
+import type { AuthUser } from '@/types';
 
 type NavConfig = {
   id: NavigationItem;
@@ -47,7 +48,11 @@ const navItems: NavConfig[] = [
 
 const mobilePrimaryNav: NavigationItem[] = ['dashboard', 'calendar', 'projects', 'invoices', 'settings'];
 
-export default function App() {
+interface AppShellProps {
+  user: AuthUser;
+}
+
+export default function App({ user }: AppShellProps) {
   const [activeNav, setActiveNav] = useState<NavigationItem>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -92,10 +97,20 @@ export default function App() {
     setMobileMenuOpen(false);
   };
 
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  };
+
   return (
     <div className="h-screen overflow-hidden bg-white">
       <div className="hidden h-full md:flex">
-        <Sidebar active={activeNav} onNavigate={handleNavigate} />
+        <Sidebar
+          active={activeNav}
+          onNavigate={handleNavigate}
+          userLabel={user.name || user.email}
+          onLogout={handleLogout}
+        />
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-5xl mx-auto p-8">
             {renderPage()}
@@ -139,6 +154,13 @@ export default function App() {
                     {item.label}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="mt-2 flex h-12 w-full items-center justify-center rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Sign out ({user.name || user.email})
+                </button>
               </div>
             </div>
           </div>

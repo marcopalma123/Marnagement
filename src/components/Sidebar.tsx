@@ -17,6 +17,8 @@ import clsx from 'clsx';
 interface SidebarProps {
   active: NavigationItem;
   onNavigate: (item: NavigationItem) => void;
+  userLabel?: string;
+  onLogout?: () => void;
 }
 
 const navItems: { id: NavigationItem; label: string; icon: React.ReactNode }[] = [
@@ -31,7 +33,7 @@ const navItems: { id: NavigationItem; label: string; icon: React.ReactNode }[] =
   { id: 'settings', label: 'Settings', icon: <Settings size={18} /> },
 ];
 
-export default function Sidebar({ active, onNavigate }: SidebarProps) {
+export default function Sidebar({ active, onNavigate, userLabel, onLogout }: SidebarProps) {
   return (
     <aside className="w-60 border-r border-gray-200 bg-gray-50/50 flex flex-col h-screen">
       <div className="p-5 border-b border-gray-200">
@@ -60,7 +62,15 @@ export default function Sidebar({ active, onNavigate }: SidebarProps) {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-200 space-y-2">
+        <p className="text-xs text-gray-500 truncate text-center">{userLabel || 'Signed in'}</p>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Sign out
+        </button>
         <p className="text-[10px] text-gray-300 text-center">v0.1.0</p>
       </div>
     </aside>
