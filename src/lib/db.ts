@@ -63,6 +63,7 @@ async function initializeTables() {
     await database`
       CREATE TABLE IF NOT EXISTS work_days (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         date TEXT NOT NULL,
         project_id TEXT,
         hours_worked REAL NOT NULL,
@@ -78,10 +79,17 @@ async function initializeTables() {
     try {
       await database`ALTER TABLE work_days ADD COLUMN is_business_day BOOLEAN DEFAULT true`;
     } catch {}
+    try {
+      await database`ALTER TABLE work_days ADD COLUMN user_id TEXT`;
+    } catch {}
+    try {
+      await database`CREATE INDEX IF NOT EXISTS idx_work_days_user_id ON work_days(user_id)`;
+    } catch {}
     
     await database`
       CREATE TABLE IF NOT EXISTS clients (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         name TEXT NOT NULL,
         email TEXT,
         company TEXT,
@@ -102,10 +110,17 @@ async function initializeTables() {
     try {
       await database`ALTER TABLE clients ADD COLUMN country TEXT`;
     } catch {}
+    try {
+      await database`ALTER TABLE clients ADD COLUMN user_id TEXT`;
+    } catch {}
+    try {
+      await database`CREATE INDEX IF NOT EXISTS idx_clients_user_id ON clients(user_id)`;
+    } catch {}
     
     await database`
       CREATE TABLE IF NOT EXISTS meetings (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         title TEXT NOT NULL,
         date TEXT NOT NULL,
         duration INTEGER,
@@ -116,10 +131,17 @@ async function initializeTables() {
         created_at TEXT NOT NULL
       )
     `;
+    try {
+      await database`ALTER TABLE meetings ADD COLUMN user_id TEXT`;
+    } catch {}
+    try {
+      await database`CREATE INDEX IF NOT EXISTS idx_meetings_user_id ON meetings(user_id)`;
+    } catch {}
     
     await database`
       CREATE TABLE IF NOT EXISTS invoices (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         invoice_number TEXT NOT NULL,
         client_id TEXT,
         month TEXT NOT NULL,
@@ -147,10 +169,17 @@ async function initializeTables() {
     try {
       await database`ALTER TABLE invoices ADD COLUMN tax_authority_amount REAL`;
     } catch {}
+    try {
+      await database`ALTER TABLE invoices ADD COLUMN user_id TEXT`;
+    } catch {}
+    try {
+      await database`CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON invoices(user_id)`;
+    } catch {}
     
     await database`
       CREATE TABLE IF NOT EXISTS settings (
-        id TEXT PRIMARY KEY DEFAULT 'default',
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL UNIQUE,
         daily_rate REAL NOT NULL DEFAULT 0,
         default_currency TEXT NOT NULL DEFAULT 'EUR',
         invoice_deadline_days INTEGER NOT NULL DEFAULT 30,
@@ -179,30 +208,54 @@ async function initializeTables() {
     try {
       await database`ALTER TABLE settings ADD COLUMN business_fiscal_number TEXT`;
     } catch {}
+    try {
+      await database`ALTER TABLE settings ADD COLUMN user_id TEXT`;
+    } catch {}
+    try {
+      await database`UPDATE settings SET user_id = id WHERE user_id IS NULL`;
+    } catch {}
+    try {
+      await database`CREATE UNIQUE INDEX IF NOT EXISTS idx_settings_user_id_unique ON settings(user_id)`;
+    } catch {}
     
     await database`
       CREATE TABLE IF NOT EXISTS templates (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         name TEXT NOT NULL,
         content TEXT NOT NULL,
         fields TEXT NOT NULL,
         created_at TEXT NOT NULL
       )
     `;
+    try {
+      await database`ALTER TABLE templates ADD COLUMN user_id TEXT`;
+    } catch {}
+    try {
+      await database`CREATE INDEX IF NOT EXISTS idx_templates_user_id ON templates(user_id)`;
+    } catch {}
     
     await database`
       CREATE TABLE IF NOT EXISTS special_days (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         date TEXT NOT NULL,
         type TEXT NOT NULL CHECK (type IN ('vacation', 'sick', 'holiday')),
         notes TEXT,
         created_at TEXT NOT NULL
       )
     `;
+    try {
+      await database`ALTER TABLE special_days ADD COLUMN user_id TEXT`;
+    } catch {}
+    try {
+      await database`CREATE INDEX IF NOT EXISTS idx_special_days_user_id ON special_days(user_id)`;
+    } catch {}
     
     await database`
       CREATE TABLE IF NOT EXISTS projects (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         name TEXT NOT NULL,
         description TEXT,
         start_date TEXT,
@@ -215,15 +268,28 @@ async function initializeTables() {
         tasks TEXT NOT NULL DEFAULT '[]'
       )
     `;
+    try {
+      await database`ALTER TABLE projects ADD COLUMN user_id TEXT`;
+    } catch {}
+    try {
+      await database`CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)`;
+    } catch {}
 
     await database`
       CREATE TABLE IF NOT EXISTS timer_state (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
         running BOOLEAN NOT NULL DEFAULT false,
         started_at TEXT,
         name TEXT
       )
     `;
+    try {
+      await database`ALTER TABLE timer_state ADD COLUMN user_id TEXT`;
+    } catch {}
+    try {
+      await database`CREATE INDEX IF NOT EXISTS idx_timer_state_user_id ON timer_state(user_id)`;
+    } catch {}
 
     await database`
       CREATE TABLE IF NOT EXISTS auth_users (
@@ -288,12 +354,16 @@ async function initializeTables() {
 }
 
 // Work Days
-export async function getWorkDaysDb(): Promise<WorkDay[]> {
+export async function getWorkDaysDb(userId: string): Promise<WorkDay[]> {
   const database = getDb();
   if (!database) return [];
   
   await initializeTables();
-  const rows = await database`SELECT * FROM work_days ORDER BY date DESC, created_at ASC`;
+  const rows = await database`
+    SELECT * FROM work_days
+    WHERE user_id = ${userId}
+    ORDER BY date DESC, created_at ASC
+  `;
   return rows.map((row: any) => ({
     id: row.id,
     date: row.date,
@@ -304,31 +374,42 @@ export async function getWorkDaysDb(): Promise<WorkDay[]> {
   }));
 }
 
-export async function saveWorkDayDb(day: WorkDay): Promise<void> {
+export async function saveWorkDayDb(userId: string, day: WorkDay): Promise<void> {
   const database = getDb();
   if (!database) return;
   
   await initializeTables();
   await database`
-    INSERT INTO work_days (id, date, project_id, hours_worked, notes, is_business_day)
-    VALUES (${day.id}, ${day.date}, ${day.projectId}, ${day.hoursWorked}, ${day.notes || ''}, true)
+    INSERT INTO work_days (id, user_id, date, project_id, hours_worked, notes, is_business_day)
+    VALUES (${day.id}, ${userId}, ${day.date}, ${day.projectId}, ${day.hoursWorked}, ${day.notes || ''}, true)
+    ON CONFLICT (id) DO UPDATE SET
+      date = ${day.date},
+      project_id = ${day.projectId},
+      hours_worked = ${day.hoursWorked},
+      notes = ${day.notes || ''},
+      is_business_day = true
+    WHERE work_days.user_id = ${userId}
   `;
 }
 
-export async function deleteWorkDayDb(id: string): Promise<void> {
+export async function deleteWorkDayDb(userId: string, id: string): Promise<void> {
   const database = getDb();
   if (!database) return;
   
-  await database`DELETE FROM work_days WHERE id = ${id}`;
+  await database`DELETE FROM work_days WHERE id = ${id} AND user_id = ${userId}`;
 }
 
 // Clients
-export async function getClientsDb(): Promise<Client[]> {
+export async function getClientsDb(userId: string): Promise<Client[]> {
   const database = getDb();
   if (!database) return [];
   
   await initializeTables();
-  const rows = await database`SELECT * FROM clients ORDER BY name`;
+  const rows = await database`
+    SELECT * FROM clients
+    WHERE user_id = ${userId}
+    ORDER BY name
+  `;
   return rows.map((row: any) => ({
     id: row.id,
     name: row.name,
@@ -342,14 +423,14 @@ export async function getClientsDb(): Promise<Client[]> {
   }));
 }
 
-export async function saveClientDb(client: Client): Promise<void> {
+export async function saveClientDb(userId: string, client: Client): Promise<void> {
   const database = getDb();
   if (!database) return;
   
   await initializeTables();
   await database`
-    INSERT INTO clients (id, name, email, company, address, postal_code, country, daily_rate, currency)
-    VALUES (${client.id}, ${client.name}, ${client.email}, ${client.company}, ${client.address || ''}, ${client.postalCode || ''}, ${client.country || ''}, ${client.dailyRate}, ${client.currency})
+    INSERT INTO clients (id, user_id, name, email, company, address, postal_code, country, daily_rate, currency)
+    VALUES (${client.id}, ${userId}, ${client.name}, ${client.email}, ${client.company}, ${client.address || ''}, ${client.postalCode || ''}, ${client.country || ''}, ${client.dailyRate}, ${client.currency})
     ON CONFLICT (id) DO UPDATE SET
       name = ${client.name},
       email = ${client.email},
@@ -359,23 +440,28 @@ export async function saveClientDb(client: Client): Promise<void> {
       country = ${client.country || ''},
       daily_rate = ${client.dailyRate},
       currency = ${client.currency}
+    WHERE clients.user_id = ${userId}
   `;
 }
 
-export async function deleteClientDb(id: string): Promise<void> {
+export async function deleteClientDb(userId: string, id: string): Promise<void> {
   const database = getDb();
   if (!database) return;
   
-  await database`DELETE FROM clients WHERE id = ${id}`;
+  await database`DELETE FROM clients WHERE id = ${id} AND user_id = ${userId}`;
 }
 
 // Meetings
-export async function getMeetingsDb(): Promise<Meeting[]> {
+export async function getMeetingsDb(userId: string): Promise<Meeting[]> {
   const database = getDb();
   if (!database) return [];
   
   await initializeTables();
-  const rows = await database`SELECT * FROM meetings ORDER BY date DESC`;
+  const rows = await database`
+    SELECT * FROM meetings
+    WHERE user_id = ${userId}
+    ORDER BY date DESC
+  `;
   return rows.map((row: any) => ({
     id: row.id,
     title: row.title,
@@ -389,14 +475,14 @@ export async function getMeetingsDb(): Promise<Meeting[]> {
   }));
 }
 
-export async function saveMeetingDb(meeting: Meeting): Promise<void> {
+export async function saveMeetingDb(userId: string, meeting: Meeting): Promise<void> {
   const database = getDb();
   if (!database) return;
   
   await initializeTables();
   await database`
-    INSERT INTO meetings (id, title, date, duration, summary, raw_text, audio_file_name, text_file_name, created_at)
-    VALUES (${meeting.id}, ${meeting.title}, ${meeting.date}, ${meeting.duration}, ${meeting.summary}, ${meeting.rawText}, ${meeting.audioFileName}, ${meeting.textFileName}, ${meeting.createdAt})
+    INSERT INTO meetings (id, user_id, title, date, duration, summary, raw_text, audio_file_name, text_file_name, created_at)
+    VALUES (${meeting.id}, ${userId}, ${meeting.title}, ${meeting.date}, ${meeting.duration}, ${meeting.summary}, ${meeting.rawText}, ${meeting.audioFileName}, ${meeting.textFileName}, ${meeting.createdAt})
     ON CONFLICT (id) DO UPDATE SET
       title = ${meeting.title},
       date = ${meeting.date},
@@ -406,23 +492,28 @@ export async function saveMeetingDb(meeting: Meeting): Promise<void> {
       audio_file_name = ${meeting.audioFileName},
       text_file_name = ${meeting.textFileName},
       created_at = ${meeting.createdAt}
+    WHERE meetings.user_id = ${userId}
   `;
 }
 
-export async function deleteMeetingDb(id: string): Promise<void> {
+export async function deleteMeetingDb(userId: string, id: string): Promise<void> {
   const database = getDb();
   if (!database) return;
   
-  await database`DELETE FROM meetings WHERE id = ${id}`;
+  await database`DELETE FROM meetings WHERE id = ${id} AND user_id = ${userId}`;
 }
 
 // Invoices
-export async function getInvoicesDb(): Promise<Invoice[]> {
+export async function getInvoicesDb(userId: string): Promise<Invoice[]> {
   const database = getDb();
   if (!database) return [];
   
   await initializeTables();
-  const rows = await database`SELECT * FROM invoices ORDER BY created_at DESC`;
+  const rows = await database`
+    SELECT * FROM invoices
+    WHERE user_id = ${userId}
+    ORDER BY created_at DESC
+  `;
   return rows.map((row: any) => ({
     id: row.id,
     invoiceNumber: row.invoice_number,
@@ -443,7 +534,7 @@ export async function getInvoicesDb(): Promise<Invoice[]> {
   }));
 }
 
-export async function saveInvoiceDb(invoice: Invoice): Promise<void> {
+export async function saveInvoiceDb(userId: string, invoice: Invoice): Promise<void> {
   const database = getDb();
   if (!database) return;
   
@@ -452,8 +543,8 @@ export async function saveInvoiceDb(invoice: Invoice): Promise<void> {
   const paidAt = invoice.receivedValue && invoice.receivedValue > 0 ? (invoice.paidAt || new Date().toISOString()) : invoice.paidAt;
   
   await database`
-    INSERT INTO invoices (id, invoice_number, client_id, month, items, subtotal, tax, total, currency, conversion_rate, received_value, tax_authority_amount, status, due_date, created_at, paid_at)
-    VALUES (${invoice.id}, ${invoice.invoiceNumber}, ${invoice.clientId}, ${invoice.month}, ${JSON.stringify(invoice.items)}, ${invoice.subtotal}, ${invoice.tax}, ${invoice.total}, ${invoice.currency}, ${invoice.conversionRate || 1}, ${invoice.receivedValue || null}, ${invoice.taxAuthorityAmount || null}, ${status}, ${invoice.dueDate}, ${invoice.createdAt}, ${paidAt})
+    INSERT INTO invoices (id, user_id, invoice_number, client_id, month, items, subtotal, tax, total, currency, conversion_rate, received_value, tax_authority_amount, status, due_date, created_at, paid_at)
+    VALUES (${invoice.id}, ${userId}, ${invoice.invoiceNumber}, ${invoice.clientId}, ${invoice.month}, ${JSON.stringify(invoice.items)}, ${invoice.subtotal}, ${invoice.tax}, ${invoice.total}, ${invoice.currency}, ${invoice.conversionRate || 1}, ${invoice.receivedValue || null}, ${invoice.taxAuthorityAmount || null}, ${status}, ${invoice.dueDate}, ${invoice.createdAt}, ${paidAt})
     ON CONFLICT (id) DO UPDATE SET
       invoice_number = ${invoice.invoiceNumber},
       client_id = ${invoice.clientId},
@@ -470,23 +561,24 @@ export async function saveInvoiceDb(invoice: Invoice): Promise<void> {
       due_date = ${invoice.dueDate},
       created_at = ${invoice.createdAt},
       paid_at = ${paidAt}
+    WHERE invoices.user_id = ${userId}
   `;
 }
 
-export async function deleteInvoiceDb(id: string): Promise<void> {
+export async function deleteInvoiceDb(userId: string, id: string): Promise<void> {
   const database = getDb();
   if (!database) return;
   
-  await database`DELETE FROM invoices WHERE id = ${id}`;
+  await database`DELETE FROM invoices WHERE id = ${id} AND user_id = ${userId}`;
 }
 
 // Settings
-export async function getSettingsDb(): Promise<Settings | null> {
+export async function getSettingsDb(userId: string): Promise<Settings | null> {
   const database = getDb();
   if (!database) return null;
   
   await initializeTables();
-  const rows = await database`SELECT * FROM settings WHERE id = 'default'`;
+  const rows = await database`SELECT * FROM settings WHERE user_id = ${userId} LIMIT 1`;
   if (rows.length === 0) return null;
   
   const row = rows[0];
@@ -507,15 +599,15 @@ export async function getSettingsDb(): Promise<Settings | null> {
   };
 }
 
-export async function saveSettingsDb(settings: Settings): Promise<void> {
+export async function saveSettingsDb(userId: string, settings: Settings): Promise<void> {
   const database = getDb();
   if (!database) return;
   
   await initializeTables();
   await database`
-    INSERT INTO settings (id, daily_rate, default_currency, invoice_deadline_days, tax_rate, business_name, business_email, business_address, business_postal_code, business_country, business_phone, business_fiscal_number, currencies, openai_api_key)
-    VALUES ('default', ${settings.dailyRate}, ${settings.defaultCurrency}, ${settings.invoiceDeadlineDays}, ${settings.taxRate}, ${settings.businessName}, ${settings.businessEmail}, ${settings.businessAddress}, ${settings.businessPostalCode || ''}, ${settings.businessCountry || ''}, ${settings.businessPhone || ''}, ${settings.businessFiscalNumber || ''}, ${JSON.stringify(settings.currencies)}, ${settings.openaiApiKey})
-    ON CONFLICT (id) DO UPDATE SET
+    INSERT INTO settings (id, user_id, daily_rate, default_currency, invoice_deadline_days, tax_rate, business_name, business_email, business_address, business_postal_code, business_country, business_phone, business_fiscal_number, currencies, openai_api_key)
+    VALUES (${userId}, ${userId}, ${settings.dailyRate}, ${settings.defaultCurrency}, ${settings.invoiceDeadlineDays}, ${settings.taxRate}, ${settings.businessName}, ${settings.businessEmail}, ${settings.businessAddress}, ${settings.businessPostalCode || ''}, ${settings.businessCountry || ''}, ${settings.businessPhone || ''}, ${settings.businessFiscalNumber || ''}, ${JSON.stringify(settings.currencies)}, ${settings.openaiApiKey})
+    ON CONFLICT (user_id) DO UPDATE SET
       daily_rate = ${settings.dailyRate},
       default_currency = ${settings.defaultCurrency},
       invoice_deadline_days = ${settings.invoiceDeadlineDays},
@@ -533,12 +625,16 @@ export async function saveSettingsDb(settings: Settings): Promise<void> {
 }
 
 // Templates
-export async function getTemplatesDb(): Promise<Template[]> {
+export async function getTemplatesDb(userId: string): Promise<Template[]> {
   const database = getDb();
   if (!database) return [];
   
   await initializeTables();
-  const rows = await database`SELECT * FROM templates ORDER BY created_at DESC`;
+  const rows = await database`
+    SELECT * FROM templates
+    WHERE user_id = ${userId}
+    ORDER BY created_at DESC
+  `;
   return rows.map((row: any) => ({
     id: row.id,
     name: row.name,
@@ -548,36 +644,41 @@ export async function getTemplatesDb(): Promise<Template[]> {
   }));
 }
 
-export async function saveTemplateDb(template: Template): Promise<void> {
+export async function saveTemplateDb(userId: string, template: Template): Promise<void> {
   const database = getDb();
   if (!database) return;
   
   await initializeTables();
   await database`
-    INSERT INTO templates (id, name, content, fields, created_at)
-    VALUES (${template.id}, ${template.name}, ${template.content}, ${JSON.stringify(template.fields)}, ${template.createdAt})
+    INSERT INTO templates (id, user_id, name, content, fields, created_at)
+    VALUES (${template.id}, ${userId}, ${template.name}, ${template.content}, ${JSON.stringify(template.fields)}, ${template.createdAt})
     ON CONFLICT (id) DO UPDATE SET
       name = ${template.name},
       content = ${template.content},
       fields = ${JSON.stringify(template.fields)},
       created_at = ${template.createdAt}
+    WHERE templates.user_id = ${userId}
   `;
 }
 
-export async function deleteTemplateDb(id: string): Promise<void> {
+export async function deleteTemplateDb(userId: string, id: string): Promise<void> {
   const database = getDb();
   if (!database) return;
   
-  await database`DELETE FROM templates WHERE id = ${id}`;
+  await database`DELETE FROM templates WHERE id = ${id} AND user_id = ${userId}`;
 }
 
 // Special Days
-export async function getSpecialDaysDb(): Promise<SpecialDay[]> {
+export async function getSpecialDaysDb(userId: string): Promise<SpecialDay[]> {
   const database = getDb();
   if (!database) return [];
   
   await initializeTables();
-  const rows = await database`SELECT * FROM special_days ORDER BY date DESC`;
+  const rows = await database`
+    SELECT * FROM special_days
+    WHERE user_id = ${userId}
+    ORDER BY date DESC
+  `;
   return rows.map((row: any) => ({
     id: row.id,
     date: row.date,
@@ -587,35 +688,40 @@ export async function getSpecialDaysDb(): Promise<SpecialDay[]> {
   }));
 }
 
-export async function saveSpecialDayDb(day: SpecialDay): Promise<void> {
+export async function saveSpecialDayDb(userId: string, day: SpecialDay): Promise<void> {
   const database = getDb();
   if (!database) return;
   
   await initializeTables();
   await database`
-    INSERT INTO special_days (id, date, type, notes, created_at)
-    VALUES (${day.id}, ${day.date}, ${day.type}, ${day.notes}, ${day.createdAt})
+    INSERT INTO special_days (id, user_id, date, type, notes, created_at)
+    VALUES (${day.id}, ${userId}, ${day.date}, ${day.type}, ${day.notes}, ${day.createdAt})
     ON CONFLICT (id) DO UPDATE SET
       date = ${day.date},
       type = ${day.type},
       notes = ${day.notes}
+    WHERE special_days.user_id = ${userId}
   `;
 }
 
-export async function deleteSpecialDayDb(id: string): Promise<void> {
+export async function deleteSpecialDayDb(userId: string, id: string): Promise<void> {
   const database = getDb();
   if (!database) return;
   
-  await database`DELETE FROM special_days WHERE id = ${id}`;
+  await database`DELETE FROM special_days WHERE id = ${id} AND user_id = ${userId}`;
 }
 
 // Projects
-export async function getProjectsDb(): Promise<Project[]> {
+export async function getProjectsDb(userId: string): Promise<Project[]> {
   const database = getDb();
   if (!database) return [];
   
   await initializeTables();
-  const rows = await database`SELECT * FROM projects ORDER BY date_created DESC`;
+  const rows = await database`
+    SELECT * FROM projects
+    WHERE user_id = ${userId}
+    ORDER BY date_created DESC
+  `;
   return rows.map((row: any) => ({
     id: row.id,
     name: row.name,
@@ -630,15 +736,15 @@ export async function getProjectsDb(): Promise<Project[]> {
   }));
 }
 
-export async function saveProjectDb(project: Project): Promise<void> {
+export async function saveProjectDb(userId: string, project: Project): Promise<void> {
   const database = getDb();
   if (!database) return;
   
   await initializeTables();
   const createdAt = project.dateCreated || new Date().toISOString();
   await database`
-    INSERT INTO projects (id, name, description, start_date, end_date, date_created, created_at, status, is_active, statuses, tasks)
-    VALUES (${project.id}, ${project.name}, ${project.description}, ${project.startDate || null}, ${project.endDate || null}, ${createdAt}, ${createdAt}, ${project.status || 'backlog'}, ${project.isActive !== false}, ${JSON.stringify(project.statuses)}, ${JSON.stringify(project.tasks)})
+    INSERT INTO projects (id, user_id, name, description, start_date, end_date, date_created, created_at, status, is_active, statuses, tasks)
+    VALUES (${project.id}, ${userId}, ${project.name}, ${project.description}, ${project.startDate || null}, ${project.endDate || null}, ${createdAt}, ${createdAt}, ${project.status || 'backlog'}, ${project.isActive !== false}, ${JSON.stringify(project.statuses)}, ${JSON.stringify(project.tasks)})
     ON CONFLICT (id) DO UPDATE SET
       name = ${project.name},
       description = ${project.description},
@@ -648,14 +754,15 @@ export async function saveProjectDb(project: Project): Promise<void> {
       is_active = ${project.isActive !== false},
       statuses = ${JSON.stringify(project.statuses)},
       tasks = ${JSON.stringify(project.tasks)}
+    WHERE projects.user_id = ${userId}
   `;
 }
 
-export async function deleteProjectDb(id: string): Promise<void> {
+export async function deleteProjectDb(userId: string, id: string): Promise<void> {
   const database = getDb();
   if (!database) return;
   
-  await database`DELETE FROM projects WHERE id = ${id}`;
+  await database`DELETE FROM projects WHERE id = ${id} AND user_id = ${userId}`;
 }
 
 // Timer State
@@ -666,18 +773,18 @@ export interface TimerState {
   name: string;
 }
 
-export async function getTimerStatesDb(): Promise<TimerState[]> {
+export async function getTimerStatesDb(userId: string): Promise<TimerState[]> {
   const database = getDb();
   if (!database) return [];
   
   await initializeTables();
   
   try {
-    await database`DELETE FROM timer_state WHERE id = 'default'`;
-  } catch {}
-  
-  try {
-    const rows = await database`SELECT * FROM timer_state ORDER BY started_at DESC`;
+    const rows = await database`
+      SELECT * FROM timer_state
+      WHERE user_id = ${userId}
+      ORDER BY started_at DESC
+    `;
     return rows.map((row: any) => ({
       id: row.id,
       running: row.running || false,
@@ -690,12 +797,15 @@ export async function getTimerStatesDb(): Promise<TimerState[]> {
   }
 }
 
-export async function getTimerStateDb(id: string): Promise<TimerState | null> {
+export async function getTimerStateDb(userId: string, id: string): Promise<TimerState | null> {
   const database = getDb();
   if (!database) return null;
   
   await initializeTables();
-  const rows = await database`SELECT * FROM timer_state WHERE id = ${id}`;
+  const rows = await database`
+    SELECT * FROM timer_state
+    WHERE id = ${id} AND user_id = ${userId}
+  `;
   if (rows.length === 0) return null;
   
   return {
@@ -706,7 +816,7 @@ export async function getTimerStateDb(id: string): Promise<TimerState | null> {
   };
 }
 
-export async function setTimerStateDb(id: string, running: boolean, startedAt: string | null, name: string = ''): Promise<void> {
+export async function setTimerStateDb(userId: string, id: string, running: boolean, startedAt: string | null, name: string = ''): Promise<void> {
   const database = getDb();
   if (!database) return;
   
@@ -714,12 +824,12 @@ export async function setTimerStateDb(id: string, running: boolean, startedAt: s
   
   try {
     if (!running && startedAt === null) {
-      await database`DELETE FROM timer_state WHERE id = ${id}`;
+      await database`DELETE FROM timer_state WHERE id = ${id} AND user_id = ${userId}`;
     } else {
-      await database`DELETE FROM timer_state WHERE id = ${id}`;
+      await database`DELETE FROM timer_state WHERE id = ${id} AND user_id = ${userId}`;
       await database`
-        INSERT INTO timer_state (id, running, started_at, name)
-        VALUES (${id}, ${running}, ${startedAt}, ${name})
+        INSERT INTO timer_state (id, user_id, running, started_at, name)
+        VALUES (${id}, ${userId}, ${running}, ${startedAt}, ${name})
       `;
     }
   } catch (err) {
