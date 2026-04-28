@@ -153,6 +153,7 @@ async function initializeTables() {
         conversion_rate REAL NOT NULL DEFAULT 1,
         received_value REAL,
         tax_authority_amount REAL,
+        exclude_from_tax_calculation BOOLEAN NOT NULL DEFAULT false,
         status TEXT NOT NULL,
         due_date TEXT NOT NULL,
         created_at TEXT NOT NULL,
@@ -168,6 +169,9 @@ async function initializeTables() {
     } catch {}
     try {
       await database`ALTER TABLE invoices ADD COLUMN tax_authority_amount REAL`;
+    } catch {}
+    try {
+      await database`ALTER TABLE invoices ADD COLUMN exclude_from_tax_calculation BOOLEAN NOT NULL DEFAULT false`;
     } catch {}
     try {
       await database`ALTER TABLE invoices ADD COLUMN user_id TEXT`;
@@ -191,6 +195,8 @@ async function initializeTables() {
         business_country TEXT,
         business_phone TEXT,
         business_fiscal_number TEXT,
+        anual_estimate REAL NOT NULL DEFAULT 0,
+        year_of_activity INTEGER NOT NULL DEFAULT 1,
         currencies TEXT NOT NULL,
         openai_api_key TEXT
       )
@@ -207,6 +213,12 @@ async function initializeTables() {
     } catch {}
     try {
       await database`ALTER TABLE settings ADD COLUMN business_fiscal_number TEXT`;
+    } catch {}
+    try {
+      await database`ALTER TABLE settings ADD COLUMN anual_estimate REAL NOT NULL DEFAULT 0`;
+    } catch {}
+    try {
+      await database`ALTER TABLE settings ADD COLUMN year_of_activity INTEGER NOT NULL DEFAULT 1`;
     } catch {}
     try {
       await database`ALTER TABLE settings ADD COLUMN user_id TEXT`;
@@ -258,6 +270,7 @@ async function initializeTables() {
         user_id TEXT NOT NULL,
         name TEXT NOT NULL,
         description TEXT,
+        work_type TEXT NOT NULL DEFAULT 'development',
         start_date TEXT,
         end_date TEXT,
         date_created TEXT NOT NULL,
@@ -319,6 +332,31 @@ async function initializeTables() {
       await database`CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires_at ON auth_sessions(expires_at)`;
     } catch {}
 
+    // Backfill legacy rows that predate user scoping:
+    // If there is exactly one auth user, claim rows with NULL/invalid user_id for that user.
+    try {
+      const authUsers = await database`SELECT id FROM auth_users ORDER BY created_at ASC LIMIT 2`;
+      if (authUsers.length === 1) {
+        const defaultUserId = authUsers[0].id;
+        await database`UPDATE work_days SET user_id = ${defaultUserId} WHERE user_id IS NULL`;
+        await database`UPDATE clients SET user_id = ${defaultUserId} WHERE user_id IS NULL`;
+        await database`UPDATE meetings SET user_id = ${defaultUserId} WHERE user_id IS NULL`;
+        await database`UPDATE invoices SET user_id = ${defaultUserId} WHERE user_id IS NULL`;
+        await database`UPDATE templates SET user_id = ${defaultUserId} WHERE user_id IS NULL`;
+        await database`UPDATE special_days SET user_id = ${defaultUserId} WHERE user_id IS NULL`;
+        await database`UPDATE projects SET user_id = ${defaultUserId} WHERE user_id IS NULL`;
+        await database`UPDATE timer_state SET user_id = ${defaultUserId} WHERE user_id IS NULL`;
+        await database`
+          UPDATE settings
+          SET user_id = ${defaultUserId}
+          WHERE user_id IS NULL
+             OR user_id NOT IN (SELECT id FROM auth_users)
+        `;
+      }
+    } catch (migrationErr) {
+      console.error('[DB] Legacy user_id migration skipped:', migrationErr);
+    }
+
     try {
       await database`ALTER TABLE projects ADD COLUMN created_at TEXT NOT NULL DEFAULT NOW()`;
     } catch {}
@@ -327,6 +365,9 @@ async function initializeTables() {
     } catch {}
     try {
       await database`ALTER TABLE projects ADD COLUMN status TEXT NOT NULL DEFAULT 'backlog'`;
+    } catch {}
+    try {
+      await database`ALTER TABLE projects ADD COLUMN work_type TEXT NOT NULL DEFAULT 'development'`;
     } catch {}
     
     // Add missing columns if table exists from previous schema
@@ -383,12 +424,16 @@ export async function saveWorkDayDb(userId: string, day: WorkDay): Promise<void>
     INSERT INTO work_days (id, user_id, date, project_id, hours_worked, notes, is_business_day)
     VALUES (${day.id}, ${userId}, ${day.date}, ${day.projectId}, ${day.hoursWorked}, ${day.notes || ''}, true)
     ON CONFLICT (id) DO UPDATE SET
+      user_id = CASE
+        WHEN work_days.user_id IS NULL THEN ${userId}
+        ELSE work_days.user_id
+      END,
       date = ${day.date},
       project_id = ${day.projectId},
       hours_worked = ${day.hoursWorked},
       notes = ${day.notes || ''},
       is_business_day = true
-    WHERE work_days.user_id = ${userId}
+    WHERE work_days.user_id = ${userId} OR work_days.user_id IS NULL
   `;
 }
 
@@ -527,6 +572,7 @@ export async function getInvoicesDb(userId: string): Promise<Invoice[]> {
     conversionRate: row.conversion_rate || 1,
     receivedValue: row.received_value || undefined,
     taxAuthorityAmount: row.tax_authority_amount || undefined,
+    excludeFromTaxCalculation: row.exclude_from_tax_calculation === true,
     status: row.status,
     dueDate: row.due_date,
     createdAt: row.created_at,
@@ -543,8 +589,8 @@ export async function saveInvoiceDb(userId: string, invoice: Invoice): Promise<v
   const paidAt = invoice.receivedValue && invoice.receivedValue > 0 ? (invoice.paidAt || new Date().toISOString()) : invoice.paidAt;
   
   await database`
-    INSERT INTO invoices (id, user_id, invoice_number, client_id, month, items, subtotal, tax, total, currency, conversion_rate, received_value, tax_authority_amount, status, due_date, created_at, paid_at)
-    VALUES (${invoice.id}, ${userId}, ${invoice.invoiceNumber}, ${invoice.clientId}, ${invoice.month}, ${JSON.stringify(invoice.items)}, ${invoice.subtotal}, ${invoice.tax}, ${invoice.total}, ${invoice.currency}, ${invoice.conversionRate || 1}, ${invoice.receivedValue || null}, ${invoice.taxAuthorityAmount || null}, ${status}, ${invoice.dueDate}, ${invoice.createdAt}, ${paidAt})
+    INSERT INTO invoices (id, user_id, invoice_number, client_id, month, items, subtotal, tax, total, currency, conversion_rate, received_value, tax_authority_amount, exclude_from_tax_calculation, status, due_date, created_at, paid_at)
+    VALUES (${invoice.id}, ${userId}, ${invoice.invoiceNumber}, ${invoice.clientId}, ${invoice.month}, ${JSON.stringify(invoice.items)}, ${invoice.subtotal}, ${invoice.tax}, ${invoice.total}, ${invoice.currency}, ${invoice.conversionRate || 1}, ${invoice.receivedValue || null}, ${invoice.taxAuthorityAmount || null}, ${invoice.excludeFromTaxCalculation === true}, ${status}, ${invoice.dueDate}, ${invoice.createdAt}, ${paidAt})
     ON CONFLICT (id) DO UPDATE SET
       invoice_number = ${invoice.invoiceNumber},
       client_id = ${invoice.clientId},
@@ -557,6 +603,7 @@ export async function saveInvoiceDb(userId: string, invoice: Invoice): Promise<v
       conversion_rate = ${invoice.conversionRate || 1},
       received_value = ${invoice.receivedValue || null},
       tax_authority_amount = ${invoice.taxAuthorityAmount || null},
+      exclude_from_tax_calculation = ${invoice.excludeFromTaxCalculation === true},
       status = ${status},
       due_date = ${invoice.dueDate},
       created_at = ${invoice.createdAt},
@@ -594,6 +641,8 @@ export async function getSettingsDb(userId: string): Promise<Settings | null> {
     businessCountry: row.business_country || '',
     businessPhone: row.business_phone || '',
     businessFiscalNumber: row.business_fiscal_number || '',
+    anualEstimate: row.anual_estimate ?? 0,
+    yearOfActivity: row.year_of_activity ?? 1,
     currencies: JSON.parse(row.currencies),
     openaiApiKey: row.openai_api_key,
   };
@@ -605,8 +654,8 @@ export async function saveSettingsDb(userId: string, settings: Settings): Promis
   
   await initializeTables();
   await database`
-    INSERT INTO settings (id, user_id, daily_rate, default_currency, invoice_deadline_days, tax_rate, business_name, business_email, business_address, business_postal_code, business_country, business_phone, business_fiscal_number, currencies, openai_api_key)
-    VALUES (${userId}, ${userId}, ${settings.dailyRate}, ${settings.defaultCurrency}, ${settings.invoiceDeadlineDays}, ${settings.taxRate}, ${settings.businessName}, ${settings.businessEmail}, ${settings.businessAddress}, ${settings.businessPostalCode || ''}, ${settings.businessCountry || ''}, ${settings.businessPhone || ''}, ${settings.businessFiscalNumber || ''}, ${JSON.stringify(settings.currencies)}, ${settings.openaiApiKey})
+    INSERT INTO settings (id, user_id, daily_rate, default_currency, invoice_deadline_days, tax_rate, business_name, business_email, business_address, business_postal_code, business_country, business_phone, business_fiscal_number, anual_estimate, year_of_activity, currencies, openai_api_key)
+    VALUES (${userId}, ${userId}, ${settings.dailyRate}, ${settings.defaultCurrency}, ${settings.invoiceDeadlineDays}, ${settings.taxRate}, ${settings.businessName}, ${settings.businessEmail}, ${settings.businessAddress}, ${settings.businessPostalCode || ''}, ${settings.businessCountry || ''}, ${settings.businessPhone || ''}, ${settings.businessFiscalNumber || ''}, ${settings.anualEstimate || 0}, ${settings.yearOfActivity || 1}, ${JSON.stringify(settings.currencies)}, ${settings.openaiApiKey})
     ON CONFLICT (user_id) DO UPDATE SET
       daily_rate = ${settings.dailyRate},
       default_currency = ${settings.defaultCurrency},
@@ -619,6 +668,8 @@ export async function saveSettingsDb(userId: string, settings: Settings): Promis
       business_country = ${settings.businessCountry || ''},
       business_phone = ${settings.businessPhone || ''},
       business_fiscal_number = ${settings.businessFiscalNumber || ''},
+      anual_estimate = ${settings.anualEstimate || 0},
+      year_of_activity = ${settings.yearOfActivity || 1},
       currencies = ${JSON.stringify(settings.currencies)},
       openai_api_key = ${settings.openaiApiKey}
   `;
@@ -726,6 +777,7 @@ export async function getProjectsDb(userId: string): Promise<Project[]> {
     id: row.id,
     name: row.name,
     description: row.description || '',
+    workType: row.work_type || 'development',
     startDate: row.start_date || '',
     endDate: row.end_date || '',
     dateCreated: row.date_created,
@@ -743,11 +795,12 @@ export async function saveProjectDb(userId: string, project: Project): Promise<v
   await initializeTables();
   const createdAt = project.dateCreated || new Date().toISOString();
   await database`
-    INSERT INTO projects (id, user_id, name, description, start_date, end_date, date_created, created_at, status, is_active, statuses, tasks)
-    VALUES (${project.id}, ${userId}, ${project.name}, ${project.description}, ${project.startDate || null}, ${project.endDate || null}, ${createdAt}, ${createdAt}, ${project.status || 'backlog'}, ${project.isActive !== false}, ${JSON.stringify(project.statuses)}, ${JSON.stringify(project.tasks)})
+    INSERT INTO projects (id, user_id, name, description, work_type, start_date, end_date, date_created, created_at, status, is_active, statuses, tasks)
+    VALUES (${project.id}, ${userId}, ${project.name}, ${project.description}, ${project.workType || 'development'}, ${project.startDate || null}, ${project.endDate || null}, ${createdAt}, ${createdAt}, ${project.status || 'backlog'}, ${project.isActive !== false}, ${JSON.stringify(project.statuses)}, ${JSON.stringify(project.tasks)})
     ON CONFLICT (id) DO UPDATE SET
       name = ${project.name},
       description = ${project.description},
+      work_type = ${project.workType || 'development'},
       start_date = ${project.startDate || null},
       end_date = ${project.endDate || null},
       status = ${project.status || 'backlog'},

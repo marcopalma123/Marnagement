@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Project, ProjectStatus, Task } from '@/types';
+import { Project, ProjectStatus, Task, WorkType } from '@/types';
 import { getProjectsRemote, saveProject, deleteProject, generateId } from '@/lib/store';
 import {
   draggable,
@@ -34,6 +34,7 @@ export default function Projects() {
   const [newDescription, setNewDescription] = useState('');
   const [newStartDate, setNewStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [newEndDate, setNewEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [newWorkType, setNewWorkType] = useState<WorkType>('development');
   const [newStatuses, setNewStatuses] = useState<ProjectStatus[]>(DEFAULT_STATUSES);
   const [newIsActive, setNewIsActive] = useState(true);
 
@@ -58,6 +59,7 @@ export default function Projects() {
     setNewDescription('');
     setNewStartDate('');
     setNewEndDate('');
+    setNewWorkType('development');
     setNewStatuses(DEFAULT_STATUSES);
     setEditingProject(null);
   };
@@ -68,6 +70,7 @@ export default function Projects() {
       id: generateId(),
       name: newName,
       description: newDescription,
+      workType: newWorkType,
       startDate: newStartDate || undefined,
       endDate: newEndDate || undefined,
       dateCreated: new Date().toISOString(),
@@ -88,6 +91,7 @@ export default function Projects() {
       ...editingProject,
       name: newName,
       description: newDescription,
+      workType: newWorkType,
       startDate: newStartDate || undefined,
       endDate: newEndDate || undefined,
       isActive: newIsActive,
@@ -104,6 +108,7 @@ export default function Projects() {
     setEditingProject(project);
     setNewName(project.name);
     setNewDescription(project.description);
+    setNewWorkType(project.workType || 'development');
     setNewStartDate(project.startDate || '');
     setNewEndDate(project.endDate || '');
     setNewStatuses((project.statuses && project.statuses.length > 0) ? project.statuses : DEFAULT_STATUSES);
@@ -291,6 +296,18 @@ export default function Projects() {
                    
                   <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <label className="text-xs text-gray-400 block mb-1">Work Type</label>
+                      <select
+                        value={newWorkType}
+                        onChange={(e) => setNewWorkType(e.target.value as WorkType)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      >
+                        <option value="development">Development</option>
+                        <option value="testing">Testing</option>
+                        <option value="support">Support</option>
+                      </select>
+                    </div>
+                    <div>
                       <label className="text-xs text-gray-400 block mb-1">Start Date</label>
                       <input
                         type="date"
@@ -368,6 +385,7 @@ export default function Projects() {
                 <tr className="border-b border-gray-200 bg-gray-50">
                   <th className="text-left p-4 text-xs font-medium text-gray-400 uppercase">Name</th>
                   <th className="text-left p-4 text-xs font-medium text-gray-400 uppercase">Status</th>
+                  <th className="text-left p-4 text-xs font-medium text-gray-400 uppercase">Work Type</th>
                   <th className="text-left p-4 text-xs font-medium text-gray-400 uppercase">Description</th>
                   <th className="text-left p-4 text-xs font-medium text-gray-400 uppercase">Start Date</th>
                   <th className="text-left p-4 text-xs font-medium text-gray-400 uppercase">End Date</th>
@@ -393,6 +411,7 @@ export default function Projects() {
                         {project.isActive !== false ? 'Active' : 'Inactive'}
                       </span>
                     </td>
+                    <td className="p-4 text-sm text-gray-500 capitalize">{project.workType || 'development'}</td>
                     <td className="p-4 text-sm text-gray-500 max-w-xs truncate">{project.description || '-'}</td>
                     <td className="p-4 text-sm text-gray-500">{formatDate(project.startDate)}</td>
                     <td className="p-4 text-sm text-gray-500">{formatDate(project.endDate)}</td>
@@ -414,7 +433,7 @@ export default function Projects() {
                 ))}
                 {projects.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-sm text-gray-400">
+                    <td colSpan={9} className="p-8 text-center text-sm text-gray-400">
                       No projects yet. Click "Add Project" to create one.
                     </td>
                   </tr>

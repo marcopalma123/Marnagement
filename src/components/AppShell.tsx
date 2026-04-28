@@ -9,6 +9,7 @@ import Projects from '@/components/Projects';
 import Meetings from '@/components/Meetings';
 import Editor from '@/components/Editor';
 import Invoices from '@/components/Invoices';
+import TaxCalculator from '@/components/TaxCalculator';
 import SettingsPage from '@/components/Settings';
 import TelegramMessage from '@/components/TelegramMessage';
 import Triggers from '@/components/Triggers';
@@ -17,6 +18,7 @@ import {
   Calendar as CalendarIcon,
   CheckSquare,
   Receipt,
+  Calculator,
   Settings,
   FileText,
   PenTool,
@@ -41,12 +43,13 @@ const navItems: NavConfig[] = [
   { id: 'meetings', label: 'Meetings', icon: <FileText size={18} /> },
   { id: 'editor', label: 'Editor', icon: <PenTool size={18} /> },
   { id: 'invoices', label: 'Invoices', icon: <Receipt size={18} /> },
+  { id: 'taxCalculator', label: 'Tax Calculator', icon: <Calculator size={18} /> },
   { id: 'telegram', label: 'Telegram', icon: <MessageCircle size={18} /> },
   { id: 'triggers', label: 'Triggers', icon: <Zap size={18} /> },
   { id: 'settings', label: 'Settings', icon: <Settings size={18} /> },
 ];
 
-const mobilePrimaryNav: NavigationItem[] = ['dashboard', 'calendar', 'projects', 'invoices', 'settings'];
+const mobilePrimaryNav: NavigationItem[] = ['dashboard', 'calendar', 'invoices', 'taxCalculator', 'settings'];
 
 interface AppShellProps {
   user: AuthUser;
@@ -67,9 +70,10 @@ export default function App({ user }: AppShellProps) {
         case '4': setActiveNav('meetings'); break;
         case '5': setActiveNav('editor'); break;
         case '6': setActiveNav('invoices'); break;
-        case '7': setActiveNav('telegram'); break;
-        case '8': setActiveNav('triggers'); break;
-        case '9': setActiveNav('settings'); break;
+        case '7': setActiveNav('taxCalculator'); break;
+        case '8': setActiveNav('telegram'); break;
+        case '9': setActiveNav('triggers'); break;
+        case '0': setActiveNav('settings'); break;
       }
     };
     window.addEventListener('keydown', handler);
@@ -84,6 +88,7 @@ export default function App({ user }: AppShellProps) {
       case 'meetings': return <Meetings />;
       case 'editor': return <Editor />;
       case 'invoices': return <Invoices />;
+      case 'taxCalculator': return <TaxCalculator />;
       case 'telegram': return <TelegramMessage />;
       case 'triggers': return <Triggers />;
       case 'settings': return <SettingsPage />;
