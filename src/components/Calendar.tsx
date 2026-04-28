@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { WorkDay, SpecialDay, Project } from '@/types';
-import { saveWorkDay, deleteWorkDay, saveSpecialDay, deleteSpecialDay, getWorkDaysRemote, getSpecialDaysRemote, getProjectsRemote, generateId } from '@/lib/store';
+import { WorkDay, SpecialDay, Project, WorkType } from '@/types';
+import { saveWorkDay, deleteWorkDay, saveSpecialDay, deleteSpecialDay, getWorkDaysRemote, getSpecialDaysRemote, getProjectsRemote, generateId, saveProject } from '@/lib/store';
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   addMonths, subMonths, isToday, isWeekend, parseISO,
@@ -21,13 +21,25 @@ export default function Calendar() {
   const [editNote, setEditNote] = useState('');
   const [dayType, setDayType] = useState<DayType>('work');
   const [newProjectId, setNewProjectId] = useState('');
+  const [newWorkType, setNewWorkType] = useState<WorkType>('development');
   const [newProjectHours, setNewProjectHours] = useState(8);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkStartDate, setBulkStartDate] = useState('');
+  const [bulkEndDate, setBulkEndDate] = useState('');
+  const [bulkIncludeWeekends, setBulkIncludeWeekends] = useState(false);
+  const [bulkSkipExisting, setBulkSkipExisting] = useState(true);
   const [showInactiveProjects, setShowInactiveProjects] = useState(false);
 
   const getProjectName = (projectId: string) => {
     if (!projectId) return '';
     const project = projects.find(p => p.id === projectId);
     return project?.name || '';
+  };
+
+  const getProjectWorkType = (projectId: string): WorkType => {
+    if (!projectId) return 'development';
+    const project = projects.find((p) => p.id === projectId);
+    return project?.workType || 'development';
   };
 
   useEffect(() => {
@@ -71,6 +83,8 @@ export default function Calendar() {
 
   const handleDayClick = (date: string) => {
     setSelectedDate(date);
+    setBulkStartDate(date);
+    setBulkEndDate(date);
     const workEntries = getWorkDayEntries(date);
     const specialDay = getSpecialDay(date);
     const isWeekendDay = isWeekend(parseISO(date));
@@ -91,18 +105,43 @@ export default function Calendar() {
   };
 
   const handleAddProject = () => {
-    if (!newProjectId || !selectedDate) return;
-    
-    const workDay: WorkDay = {
-      id: generateId(),
-      date: selectedDate,
-      projectId: newProjectId,
-      hoursWorked: newProjectHours || 8,
-      notes: editNote,
-    };
-    saveWorkDay(workDay);
-    setWorkDays(prev => [...prev, workDay]);
+    if (!selectedDate || !newProjectId) return;
+
+    const targetDates = bulkMode
+      ? getDateRange(bulkStartDate || selectedDate, bulkEndDate || selectedDate, bulkIncludeWeekends)
+      : [selectedDate];
+    if (targetDates.length === 0) return;
+
+    const newEntries: WorkDay[] = [];
+    for (const date of targetDates) {
+      const existingEntries = getWorkDayEntries(date);
+      const hasSameProject = existingEntries.some((entry) => entry.projectId === newProjectId);
+      if (bulkMode && bulkSkipExisting && hasSameProject) continue;
+
+      const workDay: WorkDay = {
+        id: generateId(),
+        date,
+        projectId: newProjectId,
+        hoursWorked: newProjectHours || 8,
+        notes: editNote,
+      };
+      saveWorkDay(workDay);
+      newEntries.push(workDay);
+    }
+
+    if (newEntries.length > 0) {
+      setWorkDays((prev) => [...prev, ...newEntries]);
+    }
+
+    const selectedProject = projects.find((p) => p.id === newProjectId);
+    if (selectedProject && (selectedProject.workType || 'development') !== newWorkType) {
+      const updatedProject: Project = { ...selectedProject, workType: newWorkType };
+      saveProject(updatedProject);
+      setProjects((prev) => prev.map((p) => (p.id === updatedProject.id ? updatedProject : p)));
+    }
+
     setNewProjectId('');
+    setNewWorkType('development');
     setNewProjectHours(8);
   };
 
@@ -122,7 +161,7 @@ export default function Calendar() {
   };
 
   const handleSave = async () => {
-    if (!selectedDate) return;
+    if (!selectedDate || dayEntries.length === 0) return;
     const dateObj = parseISO(selectedDate);
     const isWeekendDay = isWeekend(dateObj);
 
@@ -277,6 +316,9 @@ export default function Calendar() {
                           <span className="text-[9px] text-gray-500 truncate max-w-[60px]">
                             {getProjectName(entry.projectId).slice(0, 8)}
                           </span>
+                          <span className="text-[8px] uppercase text-gray-400">
+                            {getProjectWorkType(entry.projectId).slice(0, 3)}
+                          </span>
                           <span className="text-[9px] text-gray-400 font-mono">
                             {entry.hoursWorked}h
                           </span>
@@ -380,19 +422,86 @@ export default function Calendar() {
                     ))}
                   </div>
 
+                  <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={bulkMode}
+                        onChange={(e) => setBulkMode(e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      Add to multiple days
+                    </label>
+                    {bulkMode && (
+                      <div className="mt-3 space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="mb-1 block text-xs text-gray-500">From</label>
+                            <input
+                              type="date"
+                              value={bulkStartDate}
+                              onChange={(e) => setBulkStartDate(e.target.value)}
+                              className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs text-gray-500">To</label>
+                            <input
+                              type="date"
+                              value={bulkEndDate}
+                              onChange={(e) => setBulkEndDate(e.target.value)}
+                              className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                            />
+                          </div>
+                        </div>
+                        <label className="flex items-center gap-2 text-xs text-gray-600">
+                          <input
+                            type="checkbox"
+                            checked={bulkIncludeWeekends}
+                            onChange={(e) => setBulkIncludeWeekends(e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          Include weekends
+                        </label>
+                        <label className="flex items-center gap-2 text-xs text-gray-600">
+                          <input
+                            type="checkbox"
+                            checked={bulkSkipExisting}
+                            onChange={(e) => setBulkSkipExisting(e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          Skip days that already have this project
+                        </label>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex items-center gap-2">
                     <select
                       value={newProjectId}
-                      onChange={(e) => setNewProjectId(e.target.value)}
+                      onChange={(e) => {
+                        const projectId = e.target.value;
+                        setNewProjectId(projectId);
+                        setNewWorkType(getProjectWorkType(projectId));
+                      }}
                       className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
                     >
-                      <option value="">Add project...</option>
+                      <option value="">No project</option>
                       {projects
                         .filter(p => p.isActive !== false || showInactiveProjects)
                         .filter(p => !dayEntries.some(e => e.projectId === p.id))
                         .map((p) => (
                           <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
+                    </select>
+                    <select
+                      value={newWorkType}
+                      onChange={(e) => setNewWorkType(e.target.value as WorkType)}
+                      className="w-32 px-2 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                    >
+                      <option value="development">Development</option>
+                      <option value="testing">Testing</option>
+                      <option value="support">Support</option>
                     </select>
                     <input
                       type="number"
@@ -405,8 +514,8 @@ export default function Calendar() {
                     />
                     <button
                       onClick={handleAddProject}
-                      disabled={!newProjectId}
-                      className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40"
+                      disabled={!newProjectId || (bulkMode && (!bulkStartDate || !bulkEndDate))}
+                      className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       <Plus size={16} />
                     </button>
@@ -451,7 +560,8 @@ export default function Calendar() {
             <div className="flex gap-2">
               <button
                 onClick={handleSave}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+                disabled={dayEntries.length === 0}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Save
               </button>
@@ -469,4 +579,18 @@ export default function Calendar() {
       )}
     </div>
   );
+}
+
+function getDateRange(startDate: string, endDate: string, includeWeekends: boolean): string[] {
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+
+  const rangeStart = start <= end ? start : end;
+  const rangeEnd = start <= end ? end : start;
+  const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
+
+  return days
+    .filter((day) => includeWeekends || !isWeekend(day))
+    .map((day) => format(day, 'yyyy-MM-dd'));
 }

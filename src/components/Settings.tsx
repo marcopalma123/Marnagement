@@ -29,7 +29,14 @@ export default function SettingsPage() {
         getSettingsRemote(),
         getClientsRemote()
       ]);
-      setSettings(s || getSettings());
+      const mergedSettings = s
+        ? {
+            ...s,
+            anualEstimate: s.anualEstimate ?? 0,
+            yearOfActivity: s.yearOfActivity ?? 1,
+          }
+        : getSettings();
+      setSettings(mergedSettings);
       setClients(c);
     }
     loadData();
@@ -245,6 +252,34 @@ export default function SettingsPage() {
               type="number"
               value={settings.invoiceDeadlineDays || ''}
               onChange={(e) => updateSetting('invoiceDeadlineDays', parseInt(e.target.value) || 30)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 bg-white border border-gray-200 rounded-xl p-5">
+        <h3 className="text-sm font-medium text-gray-500 mb-4">Tax</h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">AnualEstimate</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={settings.anualEstimate || ''}
+              onChange={(e) => updateSetting('anualEstimate', parseFloat(e.target.value) || 0)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Year of activity</label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={settings.yearOfActivity || 1}
+              onChange={(e) => updateSetting('yearOfActivity', Math.max(1, parseInt(e.target.value, 10) || 1))}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
             />
           </div>

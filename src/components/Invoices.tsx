@@ -30,6 +30,7 @@ export default function Invoices() {
   const [manualConversionRate, setManualConversionRate] = useState('1.0000');
   const [receivedValue, setReceivedValue] = useState<string>('');
   const [taxAuthorityAmount, setTaxAuthorityAmount] = useState<string>('');
+  const [excludeFromTaxCalculation, setExcludeFromTaxCalculation] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
 
   useEffect(() => {
@@ -101,6 +102,7 @@ export default function Invoices() {
       currency,
       conversionRate: parseFloat(manualConversionRate) || 1,
       taxAuthorityAmount: parseFloat(taxAuthorityAmount) || undefined,
+      excludeFromTaxCalculation,
       status: 'draft',
       dueDate: format(dueDate, 'yyyy-MM-dd'),
       createdAt: new Date().toISOString(),
@@ -113,6 +115,7 @@ export default function Invoices() {
     setManualInvoiceNumber('');
     setManualConversionRate('1.0000');
     setTaxAuthorityAmount('');
+    setExcludeFromTaxCalculation(false);
   };
 
   const handleStatusChange = async (id: string, status: Invoice['status']) => {
@@ -138,6 +141,7 @@ export default function Invoices() {
       month: selectedMonth,
       conversionRate: parseFloat(manualConversionRate) || editingInvoice.conversionRate || 1,
       taxAuthorityAmount: parseFloat(taxAuthorityAmount) || undefined,
+      excludeFromTaxCalculation,
     };
     
     // Update local state immediately for better UX
@@ -149,6 +153,7 @@ export default function Invoices() {
     setManualInvoiceNumber('');
     setManualConversionRate('1.0000');
     setTaxAuthorityAmount('');
+    setExcludeFromTaxCalculation(false);
     setEditingInvoice(null);
   };
 
@@ -157,6 +162,7 @@ export default function Invoices() {
     setManualInvoiceNumber(inv.invoiceNumber);
     setManualConversionRate(inv.conversionRate?.toString() || '1.0000');
     setTaxAuthorityAmount(inv.taxAuthorityAmount?.toString() || '');
+    setExcludeFromTaxCalculation(inv.excludeFromTaxCalculation === true);
     setSelectedMonth(inv.month);
     setSelectedClient(inv.clientId);
     setShowCreate(true);
@@ -289,7 +295,13 @@ export default function Invoices() {
           </p>
         </div>
         <button
-          onClick={() => { setShowCreate(true); setEditingInvoice(null); setManualInvoiceNumber(''); }}
+          onClick={() => {
+            setShowCreate(true);
+            setEditingInvoice(null);
+            setManualInvoiceNumber('');
+            setTaxAuthorityAmount('');
+            setExcludeFromTaxCalculation(false);
+          }}
           className="inline-flex w-full items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 sm:w-auto"
         >
           <Plus size={16} /> Generate Invoice
@@ -301,7 +313,13 @@ export default function Invoices() {
         <div className="mt-6 bg-white border border-gray-200 rounded-xl p-5 animate-slide-up">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium">Generate Monthly Invoice</h3>
-            <button onClick={() => setShowCreate(false)} className="p-1 rounded hover:bg-gray-100">
+            <button
+              onClick={() => {
+                setShowCreate(false);
+                setExcludeFromTaxCalculation(false);
+              }}
+              className="p-1 rounded hover:bg-gray-100"
+            >
               <X size={16} />
             </button>
           </div>
@@ -370,6 +388,17 @@ export default function Invoices() {
                 placeholder="0.00"
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={excludeFromTaxCalculation}
+                  onChange={(e) => setExcludeFromTaxCalculation(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500/30"
+                />
+                Exclude from tax calculation
+              </label>
             </div>
           </div>
 
@@ -470,7 +499,23 @@ export default function Invoices() {
                       {inv.receivedValue !== undefined && inv.receivedValue > 0 && (
                         <p className="text-xs text-emerald-600 font-mono">Received: {cSymbol}{inv.receivedValue.toFixed(2)}</p>
                       )}
+                      <p className={clsx('text-xs', inv.excludeFromTaxCalculation ? 'text-amber-600' : 'text-gray-400')}>
+                        {inv.excludeFromTaxCalculation ? 'Excluded from tax calculation' : 'Included in tax calculation'}
+                      </p>
                       <div className="mt-2 flex flex-wrap items-center gap-2 sm:justify-end">
+                        <label className="flex items-center gap-1 text-xs text-gray-500">
+                          <input
+                            type="checkbox"
+                            checked={inv.excludeFromTaxCalculation === true}
+                            onChange={(e) => {
+                              const updated = { ...inv, excludeFromTaxCalculation: e.target.checked };
+                              setInvoices((prev) => prev.map((i) => (i.id === inv.id ? updated : i)));
+                              saveInvoice(updated);
+                            }}
+                            className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600"
+                          />
+                          Exclude tax
+                        </label>
                         <div className="flex items-center gap-1">
                           <span className="text-xs text-gray-400">{cSymbol}</span>
                           <input

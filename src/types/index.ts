@@ -57,6 +57,7 @@ export interface Invoice {
   conversionRate: number; // exchange rate to base currency (4 decimal places)
   receivedValue?: number; // amount received, when set marks invoice as paid
   taxAuthorityAmount?: number; // amount sent to tax authority in EUR
+  excludeFromTaxCalculation?: boolean; // when true, invoice is ignored in tax preview totals
   status: 'draft' | 'sent' | 'paid' | 'overdue';
   dueDate: string;
   createdAt: string;
@@ -75,6 +76,8 @@ export interface Settings {
   businessCountry?: string;
   businessPhone?: string;
   businessFiscalNumber?: string;
+  anualEstimate: number;
+  yearOfActivity: number;
   currencies: CurrencyConfig[];
   openaiApiKey?: string;
 }
@@ -100,7 +103,7 @@ export interface TemplateField {
   defaultValue?: string;
 }
 
-export type NavigationItem = 'dashboard' | 'calendar' | 'projects' | 'meetings' | 'editor' | 'invoices' | 'telegram' | 'triggers' | 'settings';
+export type NavigationItem = 'dashboard' | 'calendar' | 'projects' | 'meetings' | 'editor' | 'invoices' | 'taxCalculator' | 'telegram' | 'triggers' | 'settings';
 
 export interface SpecialDay {
   id: string;
@@ -114,6 +117,7 @@ export interface Project {
   id: string;
   name: string;
   description: string;
+  workType: WorkType;
   startDate?: string;
   endDate?: string;
   dateCreated: string;
@@ -136,6 +140,8 @@ export interface Task {
   statusId: string;
   createdAt: string;
 }
+
+export type WorkType = 'development' | 'testing' | 'support';
 
 export interface AuthUser {
   id: string;

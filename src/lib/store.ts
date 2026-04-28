@@ -208,6 +208,8 @@ export function getSettings(): Settings {
     businessName: '',
     businessEmail: '',
     businessAddress: '',
+    anualEstimate: 0,
+    yearOfActivity: 1,
     currencies: [
       { code: 'EUR', symbol: '€', rate: 1 },
       { code: 'USD', symbol: '$', rate: 1.08 },
@@ -219,8 +221,13 @@ export function getSettings(): Settings {
 export async function getSettingsRemote(): Promise<Settings | null> {
   const data = await fetchFromDb<Settings>('settings');
   if (data) {
-    set(STORAGE_KEYS.settings, data);
-    return data;
+    const normalized: Settings = {
+      ...data,
+      anualEstimate: data.anualEstimate ?? 0,
+      yearOfActivity: data.yearOfActivity ?? 1,
+    };
+    set(STORAGE_KEYS.settings, normalized);
+    return normalized;
   }
   return getSettings();
 }

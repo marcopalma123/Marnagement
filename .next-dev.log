@@ -8,5 +8,59 @@
    - Environments: .env.local
 
  ✓ Starting...
- ✓ Ready in 2.6s
+ ✓ Ready in 1381ms
  ○ Compiling / ...
+ ✓ Compiled / in 1655ms (2045 modules)
+[DB] DATABASE_URL exists: true length: 142
+[DB] Neon initialized
+[DB] Initializing tables...
+ ✓ Compiled in 297ms (954 modules)
+[DB] Tables initialized successfully
+ GET / 200 in 6169ms
+ ✓ Compiled /api/db in 372ms (2039 modules)
+[DB] DATABASE_URL exists: true length: 142
+[DB] Neon initialized
+[DB] Initializing tables...
+[DB] Initializing tables...
+[DB] Initializing tables...
+[DB] Tables initialized successfully
+[DB] Tables initialized successfully
+[GET] type: settings
+[GET] type: invoices
+ GET /api/db?type=settings 200 in 3365ms
+[DB] Tables initialized successfully
+ GET /api/db?type=invoices 200 in 3369ms
+[GET] type: workdays
+[GET] type: settings
+[GET] type: invoices
+ GET /api/db?type=workdays 200 in 3465ms
+ GET /api/db?type=settings 200 in 95ms
+ GET /api/db?type=invoices 200 in 95ms
+[GET] type: workdays
+ GET /api/db?type=workdays 200 in 91ms
+ GET / 200 in 366ms
+[GET] type: workdays
+[GET] type: invoices
+[GET] type: settings
+ GET /api/db?type=workdays 200 in 193ms
+ GET /api/db?type=invoices 200 in 205ms
+ GET /api/db?type=settings 200 in 206ms
+[GET] type: workdays
+[GET] type: invoices
+[GET] type: settings
+ GET /api/db?type=workdays 200 in 92ms
+ GET /api/db?type=invoices 200 in 96ms
+ GET /api/db?type=settings 200 in 95ms
+ ✓ Compiled in 455ms (2046 modules)
+[DB] DATABASE_URL exists: true length: 142
+[DB] Neon initialized
+[DB] Initializing tables...
+[DB] Tables initialized successfully
+ GET / 200 in 4133ms
+ ✓ Compiled in 281ms (2046 modules)
+[DB] DATABASE_URL exists: true length: 142
+[DB] Neon initialized
+[DB] Initializing tables...
+[DB] Tables initialized successfully
+ GET / 200 in 1715ms
+[?25h
